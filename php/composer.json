@@ -1,0 +1,15 @@
+{
+    "name": "star/php",
+    "autoload": {
+        "psr-4": {
+            "Star\\Php\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Renseyy",
+            "email": "me@makous.mk"
+        }
+    ],
+    "require": {}
+}
