@@ -21,7 +21,8 @@ class Token
 
 enum TokenType: string
 {
-    case LINE_SEPARATOR = "New line";
+    case END_OF_TOKENS = "End of tokens";
+    case END_OF_LINE = "New line";
     case IDENTIFIER = "Identifier";
     case NUMBER = "Number";
     case STRING = "String";
@@ -142,8 +143,8 @@ class Tokenizer
             // Whitespace
             if (ctype_space($char())) {
                 if ($char() === "\n") {
-                    if (end($tokens)?->type !== TokenType::LINE_SEPARATOR) {
-                        $tokens[] = new Token(TokenType::LINE_SEPARATOR, "\n", $this->index, $this->index + 1, $this->line, $startColumn);
+                    if (end($tokens)?->type !== TokenType::END_OF_LINE) {
+                        $tokens[] = new Token(TokenType::END_OF_LINE, "\n", $this->index, $this->index + 1, $this->line, $startColumn);
                     }
 
                     $this->next(true);

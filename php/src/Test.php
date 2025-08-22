@@ -2,7 +2,7 @@
 
 namespace Star\Php;
 
-require 'vendor/autoload.php';
+require './vendor/autoload.php';
 
 
 
@@ -11,9 +11,12 @@ $code = file_get_contents(__DIR__ . '/../test.sr');
 $tokenizer = new Tokenizer($code);
 $tokens = $tokenizer->tokenize();
 
-// $parser = new Parser($tokens);
-// $ast = $parser->parse();
-
-print_r($code);
-print_r($tokens);
-// print_r($ast);
+$operatorRegistry = new OperatorRegistry();
+$operatorRegistry->define('+', 10, associativity: Associativity::LEFT, infix: true);
+$operatorRegistry->define('=', 5, associativity: Associativity::RIGHT, infix: true);
+$parser = new Parser($operatorRegistry, $tokens);
+$ast = $parser->parseBlock();
+if ($parser->hasErrors()) {
+    print_r($parser->getErrors());
+}
+print_r($ast);

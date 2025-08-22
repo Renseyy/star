@@ -1,25 +1,32 @@
-#!/bin/env/star
-#memory_operator % 10 .unary_before {
-    #set_flag #this .by_field
+#define_value_operator + 10 left
+#define_operator = 0 right {
+    #alias a #argument 0
+    #alias b #argument 1
+    #outher #set a b
+    #return b
 }
 
-#value_operator ! 10 .unary_before
-
-Boolean :: Type {
-    true: #This : #symbol true
-    false: #This : #symbol false
-    value :: true | false
-    #operator ! {
-        #if #is_equal value true {
-            #return false
-        }
-        #return true
+#archetype Int {
+    #exposed value #int 4
+    #operator + #when Int {
+        #alias other #argument 0
+        #return #add #int 4 value other.value
     }
 }
 
-#define true Boolean.true
-#define false Boolean.false
+#define_defalt_integer_literal Int
 
+a = 1 + 2
 
-a = false
-b = !a
+#archetype StaticArray {
+    #deduce T #argument 0
+    #expect_all #all_arguments #type_of #type_of T
+    #set count #argument_count
+    #exposed content #byte #times #size_of T count
+    #operator #call {
+        #if #greater #argument 0 count {
+            #return #null
+        }
+        #return #load content #argument 0
+    }    
+} #type T

@@ -2,174 +2,213 @@
 
 namespace Star\Php;
 
-use Exception;
+use Error;
+use RuntimeException;
+use Star\Php\Token;
+use Star\Php\TokenType;
+use Star\Php\Util\ArrayUtil;
+
+/**
+ * Options for parser
+ * - metacomand:
+ *      metacomand have very strict rules of being parsed, then have linear argument stacking, works only for one line, and can be ended with semicolon
+ *      They can also affect environment in parse time like #use, #namespace, #import but also #define_value_operator and #define_meta_operator. We can also use them,
+ *      to affect current memory of program, but more important to #define identifiers as some type, witch can be helpful in parsing
+ */
 
 class Parser
 {
 
-    private int $i = 0;
-
-
+    private array $errors = [];
+    private int $index = 0;
     /**
-     * @param array<Token> $tokens
+     * @param Token[] $tokens
      */
-    public function __construct(
-        private array $tokens
-    ) {}
+    public function __construct(private OperatorRegistry $operatorRegistry, private array $tokens) {}
 
-    private function peek(): Token
+    public function hasErrors(): bool
     {
-        return $this->tokens[$this->i] ?? new Token(TokenType::SEMICOLON, ";", $this->i, $this->i, 0, 0);
+        return count($this->errors) > 0;
     }
 
-    private function hasToken(): bool
+    public function getErrors(): array
     {
-        return $this->i < count($this->tokens);
+        return $this->errors;
     }
 
-    private function consume(): Token
+    public function getCurrentToken($ommitLineSeparator = false, $lazy = false): ?Token
     {
-        return $this->tokens[$this->i++];
-    }
-
-    private function expect(TokenType $type): Token
-    {
-        $tok = $this->consume();
-        if ($tok->type !== $type) {
-            throw new Exception("Expected {$type->value}, got {$tok->type->value}");
+        $index = $this->index;
+        $token = ArrayUtil::get($this->tokens, $index);
+        while ($ommitLineSeparator && $token != null && $token->type === TokenType::END_OF_LINE) {
+            $index++;
+            $token = ArrayUtil::get($this->tokens, $index);
         }
-        return $tok;
-    }
-
-    private function match(TokenType ...$types): bool
-    {
-        foreach ($types as $type) {
-            if ($this->peek()->type === $type) return true;
+        if (!$lazy) {
+            $this->index = $index;
         }
-        return false;
+        return $token;
     }
 
-    private function skipSeparators(): void
+    private function advanceToken(): void
     {
-        while ($this->hasToken() && ($this->match(TokenType::LINE_SEPARATOR) || $this->match(TokenType::SEMICOLON))) {
-            $this->consume();
-        }
+        $this->index++;
     }
 
-    private function getBinaryPrecedence(TokenType $type): array
+    public function parseAndInterpreteMetaCommand(): array
     {
-        // [precedence, associativityRight]
-        return match ($type) {
-            TokenType::SET_TO => [1, true],
-            TokenType::LOGICAL_OR => [2, false],
-            TokenType::LOGICAL_AND => [3, false],
-            TokenType::IS, TokenType::SAME => [4, false],
-            TokenType::LEFT_ANGLE, TokenType::RIGHT_ANGLE => [6, false],
-            TokenType::SET_OR, TokenType::SET_AND => [7, false],
-            TokenType::PLUS, TokenType::MINUS => [10, false],
-            TokenType::STAR, TokenType::DIV, TokenType::FRAC, TokenType::MOD => [20, false],
-            TokenType::POWER => [30, true],
-            default => [0, false],
+        $token = $this->getCurrentToken();
+        return match ($token->value) {
+            'define_value_operator' => $this->parseMetaCommandDefineValueOperator(),
+            default => throw new Error("Unknown metacomand #{$token->value}")
         };
     }
 
-    private function isBinaryOperator(Token $token): bool
+    private function assertExpression(array $expression, string $type, ?string $message): array
     {
-        return in_array($token->type, [
-            TokenType::SET_TO,
-            TokenType::LOGICAL_OR,
-            TokenType::LOGICAL_AND,
-            TokenType::IS,
-            TokenType::SAME,
-            TokenType::LEFT_ANGLE,
-            TokenType::RIGHT_ANGLE,
-            TokenType::SET_OR,
-            TokenType::SET_AND,
-            TokenType::PLUS,
-            TokenType::MINUS,
-            TokenType::STAR,
-            TokenType::DIV,
-            TokenType::FRAC,
-            TokenType::MOD,
-            TokenType::POWER,
-        ], true);
-    }
-
-    public function parse(): array
-    {
-        $nodes = [];
-        $this->skipSeparators();
-        while ($this->hasToken()) {
-            $expr = $this->parseExpression(0);
-            $nodes[] = $expr;
-            $this->skipSeparators();
-            if (!$this->hasToken()) break;
+        if ($expression['type'] !== $type) {
+            throw new RuntimeException("Expected {$type}" . ($message ? ": {$message}" : ""));
         }
-        return $nodes;
+        return $expression;
     }
 
-    private function parseExpression(int $minPrecedence = 0): ASTNode
+    public function parseMetaCommandDefineValueOperator(): array
     {
-        $left = $this->parseUnaryOrPrimary();
+        $this->advanceToken();
+        $identifier = $this->assertExpression($this->parseExpression(), 'Identifier', ' as first argument `identifier` of #define_value_operator');
+        $precedence =  $this->assertExpression($this->parseExpression(), 'Number', ' as second argument `precedence` of #define_value_operator');
+        $associativity = $this->parseExpression();
+        return [
+            'type' => 'MetaCommandDefineValueOperator',
+            'identifier' => $identifier,
+            'precedence' => $precedence,
+            'associativity' => $associativity
+        ];
+    }
 
-        while ($this->hasToken() && $this->isBinaryOperator($this->peek())) {
-            [$prec, $isRightAssoc] = $this->getBinaryPrecedence($this->peek()->type);
-            if ($prec < $minPrecedence || $prec === 0) break;
-
-            $op = $this->consume();
-            $nextMinPrec = $isRightAssoc ? $prec : $prec + 1;
-            $right = $this->parseExpression($nextMinPrec);
-
-            if ($op->type === TokenType::SET_TO) {
-                if ($left->type !== "Identifier") {
-                    throw new Exception("Left-hand side of assignment must be an identifier");
+    public function parseBlock(bool $denoted = false): array
+    {
+        $expressions = [];
+        while ($this->getCurrentToken() !== null) {
+            $expressions[] = $this->parseLine();
+            $token = $this->getCurrentToken();
+            // If we have tokens to next EOL EOT, SEMICOLON or block end it means that not registered operator is used
+            if ($token != null && $token->type !== TokenType::END_OF_LINE && $token->type !== TokenType::SEMICOLON) {
+                $errorToken = $token;
+                $to = [
+                    'line' => $token->line,
+                    'column' => $token->column + strlen($token->value)
+                ];
+                while ($token != null && $token->type !== TokenType::END_OF_LINE && $token->type !== TokenType::SEMICOLON) {
+                    $this->advanceToken();
+                    $token = $this->getCurrentToken();
+                    if ($token != null) {
+                        $to = [
+                            'line' => $token->line,
+                            'column' => $token->column + strlen($token->value)
+                        ];
+                    }
                 }
-                $left = new ASTNode("Assignment", $left->start, $right->end, [
-                    "left" => $left,
-                    "right" => $right,
-                ]);
-            } else {
-                $left = new ASTNode("BinaryExpression", $left->start, $right->end, [
-                    "op" => $op->value,
-                    "left" => $left,
-                    "right" => $right,
-                ]);
+                $this->errors[] = [
+                    "message" => "Unexpected '{$token->value}'",
+                    "from" => [
+                        "line" => $errorToken->line,
+                        "column" => $errorToken->column
+                    ],
+                    "to" => $to
+                ];
             }
+            $this->advanceToken();
+        }
+        return ['type' => 'Block', 'expressions' => $expressions];
+    }
+
+    public function parseLine(): array
+    {
+        return $this->parseExpression();
+    }
+
+    public function parseExpression(int $rightBindingPower = 0): array
+    {
+        $token = $this->getCurrentToken();
+        $left = $this->parsePrefixOrLiteral($token);
+        $this->advanceToken();
+
+        while ($this->shouldParseInfixOrPostfix($rightBindingPower)) {
+            $token = $this->getCurrentToken(true);
+
+            // Postfix
+            if ($token->type === TokenType::IDENTIFIER && ($def = $this->operatorRegistry->getPostfixOperator($token->value))) {
+                echo 'is postfix\n';
+                $bindingPower = $def->precedence ?? 0;
+                if ($rightBindingPower < $bindingPower) {
+                    $this->advanceToken();
+                    $left = ['type' => 'PostfixUnary', 'operator' => $def->symbol, 'expression' => $left];
+                    continue;
+                }
+            }
+
+            // Infix
+            if ($token->type === TokenType::IDENTIFIER && ($def = $this->operatorRegistry->getInfixOperator($token->value))) {
+                $bindingPower = $def->precedence ?? 0;
+                $condition = $def->associativity === Associativity::RIGHT ? $rightBindingPower <= $bindingPower : $rightBindingPower < $bindingPower;
+                if ($condition) {
+                    $this->advanceToken();
+                    $right = $this->parseExpression(
+                        $def->associativity === Associativity::RIGHT ? $bindingPower - 1 : $bindingPower
+                    );
+                    $left = ['type' => 'Binary', 'operator' => $def->symbol, 'left' => $left, 'right' => $right];
+                    continue;
+                }
+            }
+            break;
         }
 
         return $left;
     }
 
-    private function parseUnaryOrPrimary(): ASTNode
-    {
-        $tok = $this->peek();
-        // Unary operators
-        if (in_array($tok->type, [TokenType::PLUS, TokenType::MINUS, TokenType::LOGICAL_NOT], true)) {
-            $op = $this->consume();
-            $expr = $this->parseUnaryOrPrimary();
-            return new ASTNode("UnaryExpression", $op->start, $expr->end, [
-                "op" => $op->value,
-                "argument" => $expr,
-            ]);
-        }
 
-        switch ($tok->type) {
-            case TokenType::NUMBER:
-                $this->consume();
-                return new ASTNode("NumberLiteral", $tok->start, $tok->end, $tok->value);
-            case TokenType::STRING:
-                $this->consume();
-                return new ASTNode("StringLiteral", $tok->start, $tok->end, $tok->value);
-            case TokenType::IDENTIFIER:
-                $this->consume();
-                return new ASTNode("Identifier", $tok->start, $tok->end, $tok->value);
-            case TokenType::LEFT_PAREN:
-                $this->consume();
-                $expr = $this->parseExpression(0);
-                $this->expect(TokenType::RIGHT_PAREN);
-                return $expr;
-            default:
-                throw new Exception("Unexpected token {$tok->type->value}");
+
+    private function parsePrefixOrLiteral(Token $token): array
+    {
+        return match ($token->type) {
+            TokenType::NUMBER => ['type' => 'Number', 'value' => (float)$token->value],
+            TokenType::IDENTIFIER => ['type' => 'Identifier', 'name' => $token->value],
+            TokenType::LEFT_PAREN => $this->parseGroup(),
+            TokenType::LEFT_BRACE => $this->parseBlock(true),
+            TokenType::META_COMMAND => $this->parseAndInterpreteMetaCommand(),
+            TokenType::STRING => ['type' => 'String', 'value' => $token->value],
+            default => throw new RuntimeException("Unexpected token {$token->value}")
+        };
+    }
+
+    private function parseGroup(): array
+    {
+        $expression = $this->parseExpression();
+        if ($this->getCurrentToken()->type !== TokenType::RIGHT_PAREN) {
+            throw new RuntimeException("Expected ')'");
         }
+        $this->advanceToken();
+        return $expression;
+    }
+
+    private function parsePrefixOperator(Token $token): array
+    {
+        $def = $this->operatorRegistry->getPrefixOperator($token->value);
+        if (!$def) {
+            throw new RuntimeException("Unexpected operator {$token->value}");
+        }
+        $expression = $this->parseExpression($def->precedence ?? 0);
+        return ['type' => 'PrefixUnary', 'operator' => $def->symbol, 'expression' => $expression];
+    }
+
+    private function shouldParseInfixOrPostfix(int $rightBindingPower): bool
+    {
+        $token = $this->getCurrentToken(true, lazy: true);
+        if ($token === null) return false;
+        if ($token->type !== TokenType::IDENTIFIER) return false;
+        $symbol = $token->value;
+        return $this->operatorRegistry->getInfixOperator($symbol) !== null ||
+            $this->operatorRegistry->getPostfixOperator($symbol) !== null;
     }
 }
