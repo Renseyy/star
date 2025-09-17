@@ -1,3 +1,23 @@
-import type { Scope } from '../parser';
+import type { Expression, Scope } from '../parser';
 
-export function loadStdl(scope: Scope);
+export function loadStdl(scope: Scope) {
+	const logicalNot = {
+		type: 'OperatorGroup',
+		prefix: {
+			bindingPower: 14,
+			expression: {
+				type: 'ArgumentedExpression',
+				creator(expression: Expression): Expression {
+					return {
+						type: 'LogicNotOperation',
+						expression,
+					};
+				},
+			},
+		},
+		infix: null,
+		postfix: null,
+	} as const;
+	scope.writeElement('!', logicalNot);
+	scope.writeElement('not', logicalNot);
+}

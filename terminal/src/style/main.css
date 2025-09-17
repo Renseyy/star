@@ -41,6 +41,7 @@ body {
 		background-color: transparent;
 
 		> ._Token {
+			background-color: rgba(255, 255, 255, 0.109);
 			white-space: pre;
 			color: whitesmoke;
 			&._Directive {
@@ -65,8 +66,9 @@ body {
 			&._IrrelevantToken {
 				position: relative;
 				border-radius: 0.25em;
-				outline: 1px solid rgb(255, 0, 0);
+				background-color: transparent;
 				min-width: 1ex;
+				opacity: 0.5;
 			}
 			&._InvalidToken {
 				text-decoration: red underline dotted;

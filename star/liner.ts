@@ -15,35 +15,40 @@ export type Literal = {
 	type: 'Literal';
 	contentType: string;
 	value: string;
+	startIndex: number;
+	endIndex: number;
 };
 
 export type Identifier = {
 	type: 'Identifier';
 	value: string;
+	startIndex: number;
+	endIndex: number;
 };
 
 export type Block = {
 	type: 'Block';
 	expressions: Element[];
+	startIndex: number;
+	endIndex: number;
 };
 
 export type Group = {
 	type: 'Group';
 	lines: Line[];
+	startIndex: number;
+	endIndex: number;
 };
 
 export type Line = {
 	type: 'Line';
+	isJoinable: boolean;
 	elements: Element[];
+	startIndex: number;
+	endIndex: number;
 };
 
-export type Memeber = {
-	type: 'Member';
-	of: Element;
-	what: Element;
-};
-
-export type Element = Literal | Identifier | Block | Group | Line | Memeber;
+export type Element = Literal | Identifier | Block | Group | Line;
 
 export type TokenHelper = {
 	type: 'TokenHelper';
@@ -62,6 +67,10 @@ export class Liner {
 
 	private getCurrentTokenIndex(): number {
 		return this.getCurrentToken()?.index ?? -1;
+	}
+
+	private getLastTokenIndex(): number {
+		return this.tokens.last()?.index ?? -1;
 	}
 
 	private hasToken(): boolean {
@@ -83,6 +92,7 @@ export class Liner {
 	private paraseBlock(isDirect: boolean = false): Block {
 		const expressions: Element[] = [];
 		let currentToken = this.getCurrentToken();
+		const startIndex = currentToken?.index as number;
 		if (!isDirect) {
 			if (currentToken != undefined) {
 				if (currentToken.type == TokenType.LeftBrace) {
@@ -98,9 +108,11 @@ export class Liner {
 				);
 			}
 		}
+		let endIndex = startIndex;
 		while (currentToken) {
-			const line = this.parseLine();
+			const line = this.parseLine(true);
 			expressions.push(line);
+			endIndex = line.endIndex;
 			const newToken = this.getCurrentToken();
 			if (newToken == undefined) {
 				if (!isDirect) {
@@ -122,13 +134,17 @@ export class Liner {
 					this.reportError(
 						`Unexpected token ${newToken.toString()}, expected end_of_line or semicolon`
 					);
+					endIndex--;
 				}
 				currentToken = this.advanceToken();
 			}
+			endIndex = newToken.index;
 		}
 		return {
 			type: ElementType.Block,
 			expressions,
+			startIndex,
+			endIndex,
 		};
 	}
 
@@ -138,7 +154,6 @@ export class Liner {
 	 * Idziemy od lewej do prawej strony aż dojdziemy do tokenów końcowych [END_OF_LINE, SEMICOLON]
 	 * Po drodze, jeżeli napotkamy przecinek, to podajemy mu tokeny które już przeszliśmy i taki przecinek wykonuje dalszą częśc operacji na fragmentach, a później je łączy
 	 * Jeżeli napotkamy początek elementu grupującego: [ ( { to parsujemy je w wyrażenie i idziemy dalej
-	 * Jeżeli napotkamy kropkę `.`, to bierzemy argument z lewej, a argument z prawej traktujemy `parseExpression` i idziemy dalej
 	 * Po dojściu do końca przechodzimy jeszcze raz
 	 * Każdy token traktujemy parseExpression
 	 * Uzyskujemy gotowe wyrażenia w lini
@@ -147,7 +162,7 @@ export class Liner {
 	 * @returns
 	 */
 
-	private parseLine(): Line | Group {
+	private parseLine(fromBlock: boolean = false): Line | Group {
 		const halfExpressions: (Element | TokenHelper)[] = [];
 		const finish = (): Element[] => {
 			const expressions: Element[] = [];
@@ -182,35 +197,19 @@ export class Liner {
 				)
 			) {
 				halfExpressions.push(this.parseExpression());
-			} else if (currentToken.type == TokenType.Dot) {
-				const nextToken = this.advanceToken();
-				if (nextToken == undefined) {
-					throw this.reportError(
-						'Unexpected END_OF_TOKENS, expected right operand for dot'
-					);
-				}
-				let leftExpression = halfExpressions.pop();
-				if (leftExpression == undefined) {
-					throw this.reportError(
-						'Unexpected dot as start of the line. "Context-dots" will be supported in the future'
-					);
-				}
-				if (leftExpression.type == 'TokenHelper') {
-					leftExpression = this.parseLiteral(leftExpression.token);
-				}
-				const rightExpression = this.parseExpression();
-				halfExpressions.push({
-					type: 'Member',
-					of: leftExpression,
-					what: rightExpression,
-				});
 			} else if (currentToken.type == TokenType.Comma) {
 				this.advanceToken();
 				const afterComma = this.parseLine();
+				const elements = finish();
+				let startIndex = elements[0]?.startIndex as number;
+				let endIndex = elements.last()?.endIndex as number;
 				const lines: Line[] = [
 					{
 						type: ElementType.Line,
-						elements: finish(),
+						elements: elements,
+						isJoinable: false,
+						startIndex,
+						endIndex,
 					},
 				];
 				if (afterComma.type == ElementType.Group) {
@@ -218,9 +217,13 @@ export class Liner {
 				} else {
 					lines.push(afterComma);
 				}
+				startIndex = lines[0]?.startIndex as number;
+				endIndex = lines.last()?.endIndex as number;
 				return {
 					type: ElementType.Group,
 					lines: lines,
+					startIndex,
+					endIndex,
 				};
 			} else {
 				halfExpressions.push({
@@ -230,9 +233,15 @@ export class Liner {
 				this.advanceToken();
 			}
 		}
+		const elements = finish();
+		const startIndex = elements[0]?.startIndex as number;
+		const endIndex = elements.last()?.endIndex as number;
 		return {
 			type: ElementType.Line,
-			elements: finish(),
+			elements: elements,
+			isJoinable: fromBlock,
+			startIndex,
+			endIndex,
 		};
 	}
 
@@ -241,12 +250,16 @@ export class Liner {
 			return {
 				type: ElementType.Identifier,
 				value: Token.text,
+				startIndex: Token.index,
+				endIndex: Token.index,
 			};
 		} else if (Token.type.in(TokenType.Number, TokenType.String)) {
 			return {
 				type: ElementType.Literal,
 				contentType: Token.type,
 				value: Token.text,
+				startIndex: Token.index,
+				endIndex: Token.index,
 			};
 		} else {
 			throw this.reportError(

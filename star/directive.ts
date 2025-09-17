@@ -1,3 +1,4 @@
+import type { Operation } from './core/operation';
 import type { Expression } from './parser';
 
 export type ParametredDirective = {
@@ -11,30 +12,16 @@ export type SetDirective = {
 	value: Expression;
 };
 
-export type Directive = SetDirective;
-
-// Login operations
-
-export type LogicAndOperation = {
-	type: 'LogicAndOperation';
-	left: Expression;
-	right: Expression;
-};
-
-export type LogicOrOperation = {
-	type: 'LogicOrOperation';
-	left: Expression;
-	right: Expression;
-};
-
-export type LogicNegationOperation = {
-	type: 'LogicNegationOperation';
+export type ReturnDirective = {
+	type: 'ReturnDirective';
 	expression: Expression;
 };
 
-export type Opration =
-	| LogicAndOperation
-	| LogicOrOperation
-	| LogicNegationOperation;
+export type ReadMemory = {
+	type: 'ReadMemory';
+	address: string;
+};
 
-export type HashCommands = Directive | Opration;
+export type Directive = SetDirective | ReturnDirective | ReadMemory;
+
+export type HashCommands = Directive | Operation;

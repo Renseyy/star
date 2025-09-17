@@ -1,7 +1,14 @@
 import type { Directive, HashCommands } from './directive';
 import type { Block, Element, Identifier, Line, Literal } from './liner';
 
+/**
+ * Add support for decorations and directives,
+ * - members, function calls, incontexts and indexers,
+ */
+
 export type Atom = {
+	isLineJoiner?: true;
+	isTransparent?: true;
 	type: 'Atom';
 	value: string;
 };
@@ -12,6 +19,7 @@ export type Command = {
 };
 
 export type OperatorGroup = {
+	isLineJoiner?: true;
 	type: 'OperatorGroup';
 	prefix: null | {
 		expression: ArgumentedExpression<[Expression]>;
@@ -40,7 +48,7 @@ export type ExpressionHolder = {
 	expression: Expression;
 };
 
-export type ScopeElement = Command | OperatorGroup | ExpressionHolder;
+export type ScopeElement = Command | OperatorGroup | ExpressionHolder | Atom;
 
 //TODO: dodać rejestr pamięci i układanie zgodnie z nim wartości
 export class Memory {
@@ -115,8 +123,12 @@ export type Expression =
 	| CallCommandExpression
 	| HashCommands;
 
+export class Decoration {}
+
 // Ten parser ma za zadanie zmienić poszczególne elementy na wyrażenia - posiadając już wiedzę o odpowienich operatorach
 export class Parser {
+	public decorations: Decoration[] = [];
+
 	private parseLiteral(element: Literal, scope: Scope): LiteralExpression {
 		return {
 			type: 'LiteralExpression',
@@ -131,11 +143,26 @@ export class Parser {
 		isTransparent: boolean = false
 	): BlockExpression {
 		const innerScope = isTransparent ? scope : new Scope(scope);
+		const expressions: Expression[] = [];
+		for (let i = 0; i < element.expressions.length; i++) {
+			const getNextElement =
+				i < element.expressions.length - 1
+					? () => {
+							i++;
+							return element.expressions[i] as Element;
+					  }
+					: undefined;
+			const expression = this.parseElement(
+				[element.expressions[i] as Element],
+				innerScope,
+				getNextElement
+			);
+			expressions.push(expression);
+		}
+
 		return {
 			type: 'BlockExpression',
-			expressions: element.expressions.map((element: Element) =>
-				this.parseElement([element], innerScope)
-			),
+			expressions: expressions,
 		};
 	}
 
@@ -143,16 +170,19 @@ export class Parser {
 		element: Identifier,
 		scope: Scope,
 		autoResolve: boolean = false
-	): typeof autoResolve extends true ? ScopeElement : IdentifierExpression {
+	): Expression {
 		const scopeElement = scope.readElement(element.value);
-		const resolve = (): ScopeElement => {
+		const resolve = (): Expression => {
 			if (!scopeElement)
 				throw new Error(`Cannot resolve ${element.value}`);
-			return scopeElement;
+			return {
+				type: 'ReadMemory',
+				address: element.value,
+			};
 		};
 		return autoResolve
 			? resolve()
-			: { type: 'IdentifierExpression', name: element.value, resolve };
+			: { type: 'ArgumentedExpression', creator: resolve };
 	}
 
 	private parseGroup(element: Element, scope: Scope): Expression {
@@ -174,7 +204,11 @@ export class Parser {
 		return operatorGroup.prefix.expression.creator(argument);
 	}
 
-	private parseElement(elements: Element[], scope: Scope): Expression {
+	private parseElement(
+		elements: Element[],
+		scope: Scope,
+		getNextElement?: () => Element
+	): Expression {
 		const element = elements.shift();
 		if (!element) {
 			throw new Error('PANIC NO ELEMENT');
@@ -191,7 +225,7 @@ export class Parser {
 		} else if (element.type == 'Group') {
 			return this.parseGroup(element, scope);
 		} else if (element.type == 'Line') {
-			return this.parseLine(element, scope);
+			return this.parseLine(element, scope, getNextElement);
 		}
 	}
 	/**
@@ -266,13 +300,31 @@ export class Parser {
 	public parseLine(
 		line: Line,
 		scope: Scope,
+		getNextElement?: () => Element,
 		firstCanBeCommand: boolean = true
 	): Expression {
+		const elements = line.elements;
 		// Add schema infering
-		const command = this.isFirstGetCommand(line.elements, scope);
+		const command = this.isFirstGetCommand(elements, scope);
+		let last = elements.last();
+		while (last && last.type == 'Identifier' && line.isJoinable) {
+			const scopeElement = scope.readElement(last.value);
+			if (
+				scopeElement &&
+				'isLineJoiner' in scopeElement &&
+				getNextElement
+			) {
+				const next = getNextElement();
+				if (next.type != 'Line') break;
+				elements.push(...next.elements);
+				last = elements.last();
+			} else {
+				break;
+			}
+		}
 		const sublines: Expression[] = [];
-		while (line.elements.length > 0) {
-			const subline = this.parseSubline(line.elements, scope, 0);
+		while (elements.length > 0) {
+			const subline = this.parseSubline(elements, scope, 0);
 			sublines.push(subline);
 		}
 		if (command) {
@@ -284,7 +336,7 @@ export class Parser {
 		} else {
 			if (sublines.length == 1) return sublines[0] as Expression;
 			console.dir(sublines, { depth: null });
-			throw new Error('Line have more than one expression');
+			console.error('Line have more than one expression');
 		}
 	}
 

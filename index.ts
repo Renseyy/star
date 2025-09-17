@@ -1,3 +1,4 @@
+import { loadStdl } from './star/libs/stdl';
 import { Liner } from './star/liner';
 import { Parser, Scope, type Expression } from './star/parser';
 import { Tokenizer } from './star/tokenizer';
@@ -13,41 +14,6 @@ console.dir(element, { depth: null });
 const scope = new Scope();
 
 // Operators
-scope.writeElement('&&', {
-	type: 'OperatorGroup',
-	prefix: null,
-	infix: {
-		bindingPower: 24,
-		isRightBinded: true,
-		expression: {
-			type: 'ArgumentedExpression',
-			creator(left: Expression, right: Expression) {
-				return {
-					type: 'LogicAndOperation',
-					left,
-					right,
-				};
-			},
-		},
-	},
-	postfix: null,
-});
-scope.writeElement('!', {
-	type: 'OperatorGroup',
-	prefix: {
-		bindingPower: 14,
-		expression: {
-			type: 'ArgumentedExpression',
-			creator(expression: Expression): Expression {
-				return {
-					type: 'LogicNegationOperation',
-					expression,
-				};
-			},
-		},
-	},
-	infix: null,
-	postfix: null,
-});
+loadStdl(scope);
 const tree = parser.parse(element, scope);
 console.dir(tree, { depth: null });

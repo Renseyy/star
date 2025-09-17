@@ -1,5 +1,6 @@
 import type { Token } from '../../star/token';
 import { Tokenizer } from '../../star/tokenizer';
+import { Liner } from '../../star/liner';
 import './style/main.css';
 import 'victormono';
 
@@ -8,7 +9,9 @@ function renderToken(token: Token): string {
 		token.text != 'Array' && token.text != 'Map' ? token.type : 'Hint';
 	return `<span data-index="${
 		token.index
-	}" class="_Token _${type}">${token.text.replaceAll('\n', '<br>')}</span>`;
+	}" class="_Token _${type}">${token.text.replaceAll('\n', () =>
+		type == 'IrrelevantToken' ? '␤<br>' : '⏎<br>'
+	)}</span>`;
 }
 
 document.addEventListener('DOMContentLoaded', () => {

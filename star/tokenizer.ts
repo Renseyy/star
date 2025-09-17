@@ -2,6 +2,7 @@ import { TokenType, Token } from './token';
 import './ArrayUtil';
 import {
 	isDigit,
+	isNewline,
 	isSpace,
 	isValidAlphaNumericIdentifier,
 	isValidIdentifier,
@@ -28,8 +29,19 @@ export class Tokenizer {
 	public tokens: Token[] = [];
 	public bracketStack: [TokenType, number][] = [];
 
+	public endTrimable: number = 0;
+
 	constructor(options: Partial<TokenizerOptions> = {}) {
 		this.options = { ...this.options, ...options };
+	}
+
+	private lastRelevantToken(): Token | undefined {
+		for (let i = this.tokens.length - 1; i >= 0; i--) {
+			if (this.tokens[i]?.type != TokenType.IrrelevantToken) {
+				return this.tokens[i];
+			}
+		}
+		return undefined;
 	}
 
 	private getChar(): string {
@@ -108,6 +120,14 @@ export class Tokenizer {
 		this.tokens = [];
 		this.index = 0;
 		this.bracketStack = [];
+		// find trimmable end
+		for (let i = this.length - 1; i >= 0; i--) {
+			if (!isSpace(this.input[i] as string)) {
+				this.endTrimable = i + 1;
+				break;
+			}
+		}
+
 		while (this.hasChars()) {
 			const start = this.index;
 			let currentChar = this.getChar();
@@ -194,14 +214,18 @@ export class Tokenizer {
 			} else {
 				if (isSpace(currentChar)) {
 					if (currentChar == '\n') {
-						const last = this.tokens.last();
-						const lastType = last?.type;
+						const lastRelevant = this.lastRelevantToken();
+						const lastType = lastRelevant?.type;
 						const nextChar = this.nextChar();
+						const isLastToken = nextChar === undefined;
+						const isFirstToken = lastRelevant === undefined;
+						const isLastNewLine = lastRelevant?.text == '\n';
+						const isEndTrimable = this.index >= this.endTrimable;
 						const shouldEmitEol =
-							nextChar !== undefined &&
-							lastType !== undefined &&
-							lastType !== TokenType.IrrelevantToken &&
-							last?.text != '\n' &&
+							!isEndTrimable &&
+							!isLastToken &&
+							!isFirstToken &&
+							!isLastNewLine &&
 							lastType !== TokenType.Comma &&
 							lastType !== TokenType.EndOfLine &&
 							lastType !== TokenType.LeftBrace &&

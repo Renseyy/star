@@ -36,3 +36,7 @@ export function isDigit(character: string) {
 		character
 	);
 }
+
+export function isNewline(charater: string) {
+	return charater == '\n';
+}
