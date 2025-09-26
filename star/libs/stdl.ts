@@ -1,4 +1,4 @@
-import type { Expression, Scope } from '../parser';
+import type { Expression, Scope } from '../parser-old';
 
 export function loadStdl(scope: Scope) {
 	const logicalNot = {

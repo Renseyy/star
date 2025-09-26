@@ -1,5 +1,5 @@
 import type { Operation } from './core/operation';
-import type { Expression } from './parser';
+import type { Expression } from './parser-old';
 
 export type ParametredDirective = {
 	type: 'ParametredDirective';
@@ -17,11 +17,11 @@ export type ReturnDirective = {
 	expression: Expression;
 };
 
-export type ReadMemory = {
-	type: 'ReadMemory';
+export type Variable = {
+	type: 'Variable';
 	address: string;
 };
 
-export type Directive = SetDirective | ReturnDirective | ReadMemory;
+export type Directive = SetDirective | ReturnDirective | Variable;
 
 export type HashCommands = Directive | Operation;

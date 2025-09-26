@@ -1,6 +1,6 @@
 import type { Token } from '../../star/token';
 import { Tokenizer } from '../../star/tokenizer';
-import { Liner } from '../../star/liner';
+import { Parser } from '../../star/parser';
 import './style/main.css';
 import 'victormono';
 
@@ -16,7 +16,7 @@ function renderToken(token: Token): string {
 
 document.addEventListener('DOMContentLoaded', () => {
 	const tokenizer = new Tokenizer();
-	const liner = new Liner();
+	const liner = new Parser();
 	const terminal = document.getElementById('terminal');
 	const textarea = terminal?.querySelector('textarea') as HTMLTextAreaElement;
 	const output = terminal?.querySelector('#tokens') as HTMLDivElement;

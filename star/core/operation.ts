@@ -1,6 +1,6 @@
 // Login operations
 
-import type { Expression } from '../parser';
+import type { Expression } from '../parser-old';
 
 // Test operations
 
