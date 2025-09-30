@@ -4,9 +4,17 @@ import { Parser } from '../../star/parser';
 import './style/main.css';
 import 'victormono';
 
+const specialConstructors = ['Function', 'Array', 'Map'];
+
 function renderToken(token: Token): string {
-	const type =
-		token.text != 'Array' && token.text != 'Map' ? token.type : 'Hint';
+	if (token.type == 'EndOfLine') {
+		const rest = token.text.slice(1);
+		const text =
+			'⏎<br>' +
+			rest.replaceAll('\n', '<span class="-irrelevantPart">↧<br></span>');
+		return `<span data-index="${token.index}" class="_Token _EndOfLine">${text}</span>`;
+	}
+	const type = specialConstructors.includes(token.text) ? 'Hint' : token.type;
 	return `<span data-index="${
 		token.index
 	}" class="_Token _${type}">${token.text.replaceAll('\n', () =>

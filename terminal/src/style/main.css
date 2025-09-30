@@ -17,6 +17,7 @@ body {
 	display: flex;
 	flex-direction: column;
 	background-color: black;
+	tab-size: 4ch;
 
 	textarea {
 		width: 100%;
@@ -29,7 +30,6 @@ body {
 		color: transparent;
 		caret-color: #aa7dce;
 		padding: 0;
-
 		background-color: transparent;
 	}
 
@@ -72,6 +72,13 @@ body {
 			}
 			&._InvalidToken {
 				text-decoration: red underline dotted;
+			}
+
+			&._EndOfLine {
+				> .-irrelevantPart {
+					opacity: 0.5;
+					background-color: transparent;
+				}
 			}
 		}
 	}

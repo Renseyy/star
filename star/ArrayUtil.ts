@@ -1,6 +1,6 @@
 declare global {
 	interface Array<T> {
-		last(): T | undefined;
+		last(index?: number): T | undefined;
 	}
 
 	interface String {
@@ -8,9 +8,9 @@ declare global {
 	}
 }
 
-Array.prototype.last = function () {
+Array.prototype.last = function (index: number = 1) {
 	if (this.length === 0) return undefined;
-	return this[this.length - 1];
+	return this[this.length - index];
 };
 
 String.prototype.in = function (this: string, ...array: Array<string>) {

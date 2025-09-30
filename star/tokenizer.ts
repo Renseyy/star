@@ -214,35 +214,45 @@ export class Tokenizer {
 			} else {
 				if (isSpace(currentChar)) {
 					if (currentChar == '\n') {
-						const lastRelevant = this.lastRelevantToken();
-						const lastType = lastRelevant?.type;
+						const tokenBefore = this.tokens.last();
+						const canAppend = tokenBefore
+							? tokenBefore.text.startsWith('\n')
+							: false;
+						const lastToken = canAppend
+							? this.tokens.last(2)
+							: tokenBefore;
 						const nextChar = this.nextChar();
 						const isLastToken = nextChar === undefined;
-						const isFirstToken = lastRelevant === undefined;
-						const isLastNewLine = lastRelevant?.text == '\n';
-						const isEndTrimable = this.index >= this.endTrimable;
+						const isFirstToken = lastToken === undefined;
+						const lastType = lastToken?.type;
 						const shouldEmitEol =
-							!isEndTrimable &&
 							!isLastToken &&
 							!isFirstToken &&
-							!isLastNewLine &&
 							lastType !== TokenType.Comma &&
 							lastType !== TokenType.EndOfLine &&
 							lastType !== TokenType.LeftBrace &&
 							lastType !== TokenType.LeftBracket &&
 							lastType !== TokenType.LeftParenthes;
-						if (shouldEmitEol) {
-							this.tokens.push(
-								new Token(TokenType.EndOfLine, '\n', start)
-							);
+						let type = shouldEmitEol
+							? TokenType.EndOfLine
+							: TokenType.IrrelevantToken;
+						console.table({
+							isLastToken,
+							isFirstToken,
+							lastType,
+							tokenBefore: tokenBefore?.type,
+							shouldEmitEol,
+							type,
+							canAppend,
+						});
+						if (canAppend) {
+							const token = tokenBefore as Token;
+							token.text += '\n';
+							token.type = type;
+							this.tokens[this.tokens.length - 1] = token;
 						} else {
-							this.tokens.push(
-								new Token(
-									TokenType.IrrelevantToken,
-									'\n',
-									start
-								)
-							);
+							const token = new Token(type, '\n', start);
+							this.tokens.push(token);
 						}
 					} else {
 						this.tokens.push(

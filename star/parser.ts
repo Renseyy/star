@@ -1,303 +1,382 @@
-import type { Scope } from './parser-old';
-import { Token, TokenType } from './token';
+import type { Extrans } from './core/extrans';
+import type { Directive, HashCommands } from './directive';
+import type { Token } from './token';
 
 /**
- * Liner zajmuje się rozwiązywaniem dyrektyw. W następnym kroku rozwiązywane będą wyrażenia w liniach
+ * Add support for decorations and directives,
+ * - members, function calls, incontexts and indexers,
  */
 
-export const ElementType = {
-	Literal: 'Literal',
-	Identifier: 'Identifier',
-	Block: 'Block',
-	Group: 'Group',
-	Line: 'Line',
-	Member: 'Member',
-} as const;
+export type Atom = {
+	isLineJoiner?: true;
+	isTransparent?: true;
+	type: 'Atom';
+	value: string;
+};
 
-export type ElementType = keyof typeof ElementType;
+export type Command = {
+	type: 'Command';
+	constructor: ArgumentedExpression<[Expression, Expression]>;
+};
 
-export type Literal = {
-	type: 'Literal';
+export type OperatorGroup = {
+	isLineJoiner?: true;
+	type: 'OperatorGroup';
+	prefix: null | {
+		expression: ArgumentedExpression<[Expression]>;
+		bindingPower: number;
+	};
+	infix: null | {
+		expression: ArgumentedExpression<[Expression, Expression]>;
+		bindingPower: number;
+		isRightBinded: boolean;
+	};
+	postfix: null | {
+		expression: ArgumentedExpression<[Expression]>;
+		bindingPower: number;
+	};
+};
+
+export type InfixOperator = {
+	type: 'InfixOperator';
+	bindingPower: number;
+	isRightBinded: boolean;
+	expression: ArgumentedExpression<[Expression, Expression]>;
+};
+
+export type ExpressionHolder = {
+	type: 'ExpressionHolder';
+	expression: Expression;
+};
+
+export type ScopeElement = Command | OperatorGroup | ExpressionHolder | Atom;
+
+//TODO: dodać rejestr pamięci i układanie zgodnie z nim wartości
+export class Memory {
+	private registry: Record<string, string> = {};
+}
+export class Scope {
+	private registry: Record<string, ScopeElement> = {};
+	constructor(public parent?: Scope) {}
+
+	public readElement(name: string): ScopeElement | null {
+		if (this.registry[name]) return this.registry[name];
+		if (this.parent) return this.parent.readElement(name);
+		return null;
+	}
+
+	public writeElement(name: string, element: ScopeElement) {
+		this.registry[name] = element;
+	}
+}
+
+export type ArgumentedExpression<Args extends Expression[]> = {
+	type: 'ArgumentedExpression';
+	creator: (...args: Args) => Expression;
+};
+
+export type LiteralExpression = {
+	type: 'LiteralExpression';
 	contentType: string;
 	value: string;
-	startIndex: number;
-	endIndex: number;
 };
 
-export type Identifier = {
-	type: 'Identifier';
-	value: string;
-	startIndex: number;
-	endIndex: number;
+export type BlockExpression = {
+	type: 'BlockExpression';
+	expressions: Expression[];
 };
 
-export type Block = {
-	type: 'Block';
-	expressions: Element[];
-	startIndex: number;
-	endIndex: number;
+export type IdentifierExpression = {
+	type: 'IdentifierExpression';
+	name: string;
+	resolve: () => ScopeElement;
 };
 
-export type Group = {
-	type: 'Group';
-	lines: Line[];
-	startIndex: number;
-	endIndex: number;
+export type TemporaryOperatorExpression = {
+	type: 'TemporaryOperatorExpression';
+	expressions: Expression[];
+	name: string;
+	info: string;
 };
 
-export type Line = {
-	type: 'Line';
-	isJoinable: boolean;
-	elements: Element[];
-	startIndex: number;
-	endIndex: number;
+export type GroupExpression = {
+	type: 'GroupExpression';
+	expressions: Expression[];
 };
 
-export type Element = Literal | Identifier | Block | Group | Line;
-
-export type TokenHelper = {
-	type: 'TokenHelper';
-	token: Token;
+export type CallCommandExpression = {
+	type: 'CallCommandExpression';
+	command: Command;
+	arguments: Expression[];
 };
 
+export type UnresolvedExpression = {
+	type: 'UnresolvedExpression';
+	resolve: (...args: Expression[]) => Expression;
+};
+
+export type Expression =
+	| LiteralExpression
+	| BlockExpression
+	| IdentifierExpression
+	| TemporaryOperatorExpression
+	| ArgumentedExpression<any>
+	| CallCommandExpression
+	| HashCommands
+	| Extrans;
+
+export class Decoration {}
+
+// Ten parser ma za zadanie zmienić poszczególne elementy na wyrażenia - posiadając już wiedzę o odpowienich operatorach
 export class Parser {
-	private index = 0;
-
-	// Tokens without irrelevant
 	private tokens: Token[] = [];
+	private index = 0;
+	public decorations: Decoration[] = [];
+	private scopes: Scope[] = [];
 
-	private getCurrentToken(): Token | undefined {
-		return this.tokens[this.index];
+	private getCurrentToken(forTest: true): Token | null;
+	private getCurrentToken(forTest?: false): Token;
+	private getCurrentToken(forTest: boolean = false): Token | null {
+		const token = this.tokens[this.index];
+		if (forTest) {
+			return token ?? null;
+		}
+		if (!token) {
+			throw new Error('Unexpected end of input');
+		}
+		return token;
 	}
 
-	private getCurrentTokenIndex(): number {
-		return this.getCurrentToken()?.index ?? -1;
+	public parse(tokens: Token[], scope: Scope = new Scope()): BlockExpression {
+		this.tokens = tokens;
+		this.index = 0;
+		this.scopes.push(scope);
+		return this.parseBlockInsides(scope);
 	}
 
-	private getLastTokenIndex(): number {
-		return this.tokens.last()?.index ?? -1;
+	private parseLiteral(scope: Scope): LiteralExpression {
+		const currentToken = this.get;
+		return {
+			type: 'LiteralExpression',
+			contentType: element.contentType,
+			value: element.value,
+		};
 	}
 
-	private hasToken(): boolean {
-		return this.index < this.tokens.length;
+	private parseBlock(
+		scope: Scope,
+		isTransparent: boolean = false
+	): BlockExpression {
+		const innerScope = isTransparent ? scope : new Scope(scope);
+		const expressions: Expression[] = [];
+		for (let i = 0; i < element.expressions.length; i++) {
+			const getNextElement =
+				i < element.expressions.length - 1
+					? () => {
+							i++;
+							return element.expressions[i] as Element;
+					  }
+					: undefined;
+			const expression = this.parseElement(
+				[element.expressions[i] as Element],
+				innerScope,
+				getNextElement
+			);
+			expressions.push(expression);
+		}
+
+		return {
+			type: 'BlockExpression',
+			expressions: expressions,
+		};
 	}
 
-	private advanceToken(): Token | undefined {
-		this.index++;
-		return this.getCurrentToken();
+	private parseIdentifier(
+		element: Identifier,
+		scope: Scope,
+		autoResolve: boolean = false
+	): Expression {
+		const scopeElement = scope.readElement(element.value);
+		const resolve = (): Expression => {
+			if (!scopeElement)
+				throw new Error(`Cannot resolve ${element.value}`);
+			return {
+				type: 'ReadMemory',
+				address: element.value,
+			};
+		};
+		return autoResolve
+			? resolve()
+			: { type: 'ReadOperation', address: resolve };
 	}
 
-	private reportError(
-		message: string,
-		tokenIndex: number = this.getCurrentTokenIndex()
-	) {
-		throw new Error(message);
+	private parseGroup(element: Element, scope: Scope): Expression {
+		throw new Error('Group is not implemented');
 	}
 
-	private paraseBlock(isDirect: boolean = false): Block {
-		const expressions: Element[] = [];
-		let currentToken = this.getCurrentToken();
-		const startIndex = currentToken?.index as number;
-		if (!isDirect) {
-			if (currentToken != undefined) {
-				if (currentToken.type == TokenType.LeftBrace) {
-					currentToken = this.advanceToken();
-				} else {
-					this.reportError(
-						`Unexpected token ${currentToken.toString()} expected [ LEFT_BRACE '{' ]`
-					);
-				}
-			} else {
-				this.reportError(
-					'Unexpected END_OF_TOKENS expected [ LEFT_BRACE `{` ]'
+	private parseMaybePrefixOperator(
+		identifier: Identifier,
+		elements: Element[],
+		scope: Scope
+	): null | Expression {
+		const name = identifier.value;
+		const operatorGroup = scope.readElement(name);
+		if (!operatorGroup || operatorGroup.type != 'OperatorGroup')
+			return null;
+		if (operatorGroup.prefix == null) return null;
+		const bindingPower = operatorGroup.prefix.bindingPower;
+		const argument = this.parseSubline(elements, scope, bindingPower);
+		return operatorGroup.prefix.expression.creator(argument);
+	}
+
+	private parseElement(
+		elements: Element[],
+		scope: Scope,
+		getNextElement?: () => Element
+	): Expression {
+		const element = elements.shift();
+		if (!element) {
+			throw new Error('PANIC NO ELEMENT');
+		}
+		if (element.type == 'Literal') {
+			return this.parseLiteral(element, scope);
+		} else if (element.type == 'Block') {
+			return this.parseBlock(element, scope);
+		} else if (element.type == 'Identifier') {
+			return (
+				this.parseMaybePrefixOperator(element, elements, scope) ??
+				this.parseIdentifier(element, scope)
+			);
+		} else if (element.type == 'Group') {
+			return this.parseGroup(element, scope);
+		} else if (element.type == 'Line') {
+			return this.parseLine(element, scope, getNextElement);
+		}
+	}
+	/**
+	 * @mutates elements
+	 */
+	public isFirstGetCommand(
+		elements: Element[],
+		scope: Scope
+	): Command | null {
+		if (elements.length < 1) return null;
+		const element = elements[0] as Element;
+		if (element.type != 'Identifier') return null;
+		const scopeElement = scope.readElement(element.value);
+		if (!scopeElement || scopeElement.type != 'Command') return null;
+		elements.shift();
+		return scopeElement;
+	}
+
+	public parseSubline(
+		elements: Element[],
+		scope: Scope,
+		rightBindingPower: number = 0
+	): Expression {
+		let element = elements[0];
+		if (!element) {
+			throw new Error(
+				'PANIC: Subline is empty - this should never happend at this stage of evaluating'
+			);
+		}
+		let left = this.parseElement(elements, scope);
+		while (this.shouldParseInfixOrPostfix(elements[0], scope)) {
+			element = elements[0];
+			if (!element || element.type != 'Identifier') break;
+			const operatorGroup = scope.readElement(element.value);
+			if (!operatorGroup || operatorGroup.type != 'OperatorGroup') {
+				throw new Error(
+					'PANIC: OperatorGroup not found - add error message in future'
 				);
 			}
-		}
-		let endIndex = startIndex;
-		while (currentToken) {
-			const line = this.parseLine(true);
-			expressions.push(line);
-			endIndex = line.endIndex;
-			const newToken = this.getCurrentToken();
-			if (newToken == undefined) {
-				if (!isDirect) {
-					this.reportError(
-						'Unexpected END_OF_TOKENS expected [ RIGHT_BRACE `}` ]'
-					);
+			if (operatorGroup.postfix != null) {
+				const bindingPower = operatorGroup.postfix.bindingPower;
+				if (bindingPower > rightBindingPower) {
+					left = operatorGroup.postfix.expression.creator(left);
+					element = elements.shift();
+					continue;
 				}
-				break;
-			} else {
+			}
+			if (operatorGroup.infix != null) {
+				const bindingPower = operatorGroup.infix.bindingPower;
 				if (
-					newToken.type != TokenType.Semicolon &&
-					newToken.type != TokenType.EndOfLine
+					bindingPower > rightBindingPower ||
+					(bindingPower == rightBindingPower &&
+						operatorGroup.infix.isRightBinded)
 				) {
-					if (newToken.type == TokenType.RightBrace && !isDirect) {
-						// eat right brace
-						this.advanceToken();
-						break;
-					}
-					this.reportError(
-						`Unexpected token ${newToken.toString()}, expected end_of_line or semicolon`
+					const oldElement = element;
+					element = elements.shift();
+					const right = this.parseSubline(
+						elements,
+						scope,
+						bindingPower
 					);
-					endIndex--;
+					left = operatorGroup.infix.expression.creator(left, right);
+
+					continue;
 				}
-				currentToken = this.advanceToken();
 			}
-			endIndex = newToken.index;
+			break;
 		}
-		return {
-			type: ElementType.Block,
-			expressions,
-			startIndex,
-			endIndex,
-		};
+		return left;
 	}
 
-	/**
-	 * Jako, że musimy od razu połączyć odpowiednie elementy w grupy, linie, ale też member
-	 * Algorytm:
-	 * Idziemy od lewej do prawej strony aż dojdziemy do tokenów końcowych [END_OF_LINE, SEMICOLON]
-	 * Po drodze, jeżeli napotkamy przecinek, to podajemy mu tokeny które już przeszliśmy i taki przecinek wykonuje dalszą częśc operacji na fragmentach, a później je łączy
-	 * Jeżeli napotkamy początek elementu grupującego: [ ( { to parsujemy je w wyrażenie i idziemy dalej
-	 * Po dojściu do końca przechodzimy jeszcze raz
-	 * Każdy token traktujemy parseExpression
-	 * Uzyskujemy gotowe wyrażenia w lini
-	 *
-	 * W ten sposób nie musimy mieć pełego parsera na tym etapie
-	 * @returns
-	 */
-
-	private parseLine(fromBlock: boolean = false): Line | Group {
-		const halfExpressions: (Element | TokenHelper)[] = [];
-		const finish = (): Element[] => {
-			const expressions: Element[] = [];
-			for (const halfExpression of halfExpressions) {
-				if (halfExpression.type == 'TokenHelper') {
-					const expression = this.parseLiteral(halfExpression.token);
-					expressions.push(expression);
-				} else {
-					expressions.push(halfExpression);
-				}
-			}
-			return expressions;
-		};
-		for (
-			let currentToken = this.getCurrentToken();
-			currentToken;
-			currentToken = this.getCurrentToken()
-		) {
+	public parseLine(
+		line: Line,
+		scope: Scope,
+		getNextElement?: () => Element,
+		firstCanBeCommand: boolean = true
+	): Expression {
+		const elements = line.elements;
+		// Add schema infering
+		const command = this.isFirstGetCommand(elements, scope);
+		let last = elements.last();
+		while (last && last.type == 'Identifier' && line.isJoinable) {
+			const scopeElement = scope.readElement(last.value);
 			if (
-				currentToken.type == TokenType.EndOfLine ||
-				currentToken.type == TokenType.Semicolon ||
-				currentToken.type == TokenType.RightBrace ||
-				currentToken.type == TokenType.RightBracket ||
-				currentToken.type == TokenType.RightParenthes
+				scopeElement &&
+				'isLineJoiner' in scopeElement &&
+				getNextElement
 			) {
-				break;
-			} else if (
-				currentToken.type.in(
-					TokenType.LeftBrace,
-					TokenType.LeftBracket,
-					TokenType.LeftParenthes
-				)
-			) {
-				halfExpressions.push(this.parseExpression());
-			} else if (currentToken.type == TokenType.Comma) {
-				this.advanceToken();
-				const afterComma = this.parseLine();
-				const elements = finish();
-				let startIndex = elements[0]?.startIndex as number;
-				let endIndex = elements.last()?.endIndex as number;
-				const lines: Line[] = [
-					{
-						type: ElementType.Line,
-						elements: elements,
-						isJoinable: false,
-						startIndex,
-						endIndex,
-					},
-				];
-				if (afterComma.type == ElementType.Group) {
-					lines.push(...afterComma.lines);
-				} else {
-					lines.push(afterComma);
-				}
-				startIndex = lines[0]?.startIndex as number;
-				endIndex = lines.last()?.endIndex as number;
-				return {
-					type: ElementType.Group,
-					lines: lines,
-					startIndex,
-					endIndex,
-				};
+				const next = getNextElement();
+				if (next.type != 'Line') break;
+				elements.push(...next.elements);
+				last = elements.last();
 			} else {
-				halfExpressions.push({
-					type: 'TokenHelper',
-					token: currentToken,
-				});
-				this.advanceToken();
+				break;
 			}
 		}
-		const elements = finish();
-		const startIndex = elements[0]?.startIndex as number;
-		const endIndex = elements.last()?.endIndex as number;
-		return {
-			type: ElementType.Line,
-			elements: elements,
-			isJoinable: fromBlock,
-			startIndex,
-			endIndex,
-		};
-	}
-
-	private parseLiteral(Token: Token): Element {
-		if (Token.type == TokenType.Identifier) {
+		const sublines: Expression[] = [];
+		while (elements.length > 0) {
+			const subline = this.parseSubline(elements, scope, 0);
+			sublines.push(subline);
+		}
+		if (command) {
 			return {
-				type: ElementType.Identifier,
-				value: Token.text,
-				startIndex: Token.index,
-				endIndex: Token.index,
-			};
-		} else if (Token.type.in(TokenType.Number, TokenType.String)) {
-			return {
-				type: ElementType.Literal,
-				contentType: Token.type,
-				value: Token.text,
-				startIndex: Token.index,
-				endIndex: Token.index,
+				type: 'CallCommandExpression',
+				command,
+				arguments: sublines,
 			};
 		} else {
-			throw this.reportError(
-				`Unexpected token ${Token.toString()}, expected Literal`
-			);
+			if (sublines.length == 1) return sublines[0] as Expression;
+			console.dir(sublines, { depth: null });
+			console.error('Line have more than one expression');
 		}
 	}
 
-	private parseExpression(): Element {
-		const currentToken = this.getCurrentToken();
-		if (currentToken == undefined) {
-			throw this.reportError('Unexpected END_OF_TOKENS');
-		} else if (
-			currentToken.type.in(
-				TokenType.Identifier,
-				TokenType.Number,
-				TokenType.String
-			)
-		) {
-			this.advanceToken();
-			return this.parseLiteral(currentToken);
-		} else if (currentToken.type == TokenType.LeftBrace) {
-			return this.paraseBlock();
-		} else {
-			throw this.reportError(
-				`Unexpected token ${currentToken.toString()}, expected identifier`
-			);
-		}
+	public shouldParseInfixOrPostfix(
+		token: Token | undefined,
+		scope: Scope
+	): boolean {
+		if (!token) return false;
+		if (token.type != 'Identifier') return false;
+		const scopeElement = scope.readElement(token.text);
+		if (!scopeElement || scopeElement.type != 'OperatorGroup') return false;
+		return scopeElement.postfix != null || scopeElement.infix != null;
 	}
 
-	public parse(tokens: Token[], scope: Scope) {
-		this.index = 0;
-		this.tokens = tokens.filter((t) => t.type != TokenType.IrrelevantToken);
-		return this.paraseBlock(true);
+	public parse(element: Element, scope: Scope = new Scope()) {
+		return this.parseElement([element], scope);
 	}
 }
