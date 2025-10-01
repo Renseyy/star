@@ -147,20 +147,8 @@ export class Parser {
 		return token;
 	}
 
-	public parse(tokens: Token[], scope: Scope = new Scope()): BlockExpression {
-		this.tokens = tokens;
-		this.index = 0;
-		this.scopes.push(scope);
-		return this.parseBlockInsides(scope);
-	}
-
-	private parseLiteral(scope: Scope): LiteralExpression {
-		const currentToken = this.get;
-		return {
-			type: 'LiteralExpression',
-			contentType: element.contentType,
-			value: element.value,
-		};
+	private hasToken(): boolean {
+		return this.index < this.tokens.length;
 	}
 
 	private parseBlock(
@@ -229,17 +217,14 @@ export class Parser {
 		return operatorGroup.prefix.expression.creator(argument);
 	}
 
-	private parseElement(
-		elements: Element[],
-		scope: Scope,
-		getNextElement?: () => Element
-	): Expression {
-		const element = elements.shift();
-		if (!element) {
-			throw new Error('PANIC NO ELEMENT');
-		}
-		if (element.type == 'Literal') {
-			return this.parseLiteral(element, scope);
+	private parseElement(scope: Scope): Expression {
+		let currentToken = this.getCurrentToken();
+		if (['Number', 'String'].includes(currentToken.type)) {
+			return {
+				type: 'LiteralExpression',
+				contentType: currentToken.type,
+				value: currentToken.content || currentToken.text,
+			};
 		} else if (element.type == 'Block') {
 			return this.parseBlock(element, scope);
 		} else if (element.type == 'Identifier') {
@@ -269,18 +254,11 @@ export class Parser {
 		return scopeElement;
 	}
 
-	public parseSubline(
-		elements: Element[],
+	public parseExpression(
 		scope: Scope,
 		rightBindingPower: number = 0
 	): Expression {
-		let element = elements[0];
-		if (!element) {
-			throw new Error(
-				'PANIC: Subline is empty - this should never happend at this stage of evaluating'
-			);
-		}
-		let left = this.parseElement(elements, scope);
+		let left = this.parseElement(scope);
 		while (this.shouldParseInfixOrPostfix(elements[0], scope)) {
 			element = elements[0];
 			if (!element || element.type != 'Identifier') break;
@@ -322,49 +300,6 @@ export class Parser {
 		return left;
 	}
 
-	public parseLine(
-		line: Line,
-		scope: Scope,
-		getNextElement?: () => Element,
-		firstCanBeCommand: boolean = true
-	): Expression {
-		const elements = line.elements;
-		// Add schema infering
-		const command = this.isFirstGetCommand(elements, scope);
-		let last = elements.last();
-		while (last && last.type == 'Identifier' && line.isJoinable) {
-			const scopeElement = scope.readElement(last.value);
-			if (
-				scopeElement &&
-				'isLineJoiner' in scopeElement &&
-				getNextElement
-			) {
-				const next = getNextElement();
-				if (next.type != 'Line') break;
-				elements.push(...next.elements);
-				last = elements.last();
-			} else {
-				break;
-			}
-		}
-		const sublines: Expression[] = [];
-		while (elements.length > 0) {
-			const subline = this.parseSubline(elements, scope, 0);
-			sublines.push(subline);
-		}
-		if (command) {
-			return {
-				type: 'CallCommandExpression',
-				command,
-				arguments: sublines,
-			};
-		} else {
-			if (sublines.length == 1) return sublines[0] as Expression;
-			console.dir(sublines, { depth: null });
-			console.error('Line have more than one expression');
-		}
-	}
-
 	public shouldParseInfixOrPostfix(
 		token: Token | undefined,
 		scope: Scope
@@ -376,7 +311,19 @@ export class Parser {
 		return scopeElement.postfix != null || scopeElement.infix != null;
 	}
 
-	public parse(element: Element, scope: Scope = new Scope()) {
-		return this.parseElement([element], scope);
+	private parseBlockInsides(scope: Scope): BlockExpression {
+		const expressions: Expression[] = [];
+		while (this.getCurrentToken() != null) {
+			const expression = this.parseExpression(scope);
+			expressions.push(expression);
+		}
+		return { type: 'BlockExpression', expressions };
+	}
+
+	public parse(tokens: Token[], scope: Scope = new Scope()): BlockExpression {
+		this.tokens = tokens;
+		this.index = 0;
+		this.scopes.push(scope);
+		return this.parseBlockInsides(scope);
 	}
 }
