@@ -1,19 +1,16 @@
-# mngr
+# MetaScope
+Holds defined structs, operators, MemoryHolders (place for data)
 
-To install dependencies:
+! Wszystko jest konstruktorem, chyba, że jest danymi. Programowanie objektowe jest tak na prawdę abstrakcją nad tym. Przykład:
 
-```bash
-bun install
-```
+// Tworzymy konstruktor funkcji
 
-To run:
+#constructor Function arguments {
+    // zasięg wywołania przechowany jest w zmiennej  oznaczonej jako drugi argument ( w tym przypadku `arguments` )
+    // jest to dowolny zasięg, ale możemy to zmienić, używając na nim `#set_parameters arguments`. Jednocześnie wymusi to walidację zwracanego przez arguments typów na kroktę
+    // Zwracamy funkcję, która jest tylko Archetypem, 
+    #register #archetype Function 
+}
 
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.2.20. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
-
-# STAR
-
-Jeżeli komenda jest na począku lini to zostanie uznana za wywołanie, na dalszym miejscu będzie 
+### `#archetype`
+Tworzy nowy archetyp. Przyjmuje dwie wartości - nazwę bazową i argumenty generyczne

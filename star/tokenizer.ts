@@ -135,14 +135,17 @@ export class Tokenizer {
 				this.pushToken(new Token(TokenType.Comma, currentChar, start));
 			} else if (currentChar == '(') {
 				this.pushToken(
-					new Token(TokenType.LeftParenthes, currentChar, start),
+					new Token(TokenType.LeftParenthesis, currentChar, start),
 					true
 				);
 			} else if (currentChar == ')') {
 				this.trimBefore();
-				this.expect(TokenType.LeftParenthes, TokenType.RightParenthes);
+				this.expect(
+					TokenType.LeftParenthesis,
+					TokenType.RightParenthesis
+				);
 				this.pushToken(
-					new Token(TokenType.RightParenthes, currentChar, start)
+					new Token(TokenType.RightParenthesis, currentChar, start)
 				);
 			} else if (currentChar == '{') {
 				this.pushToken(
@@ -232,7 +235,7 @@ export class Tokenizer {
 							lastType !== TokenType.EndOfLine &&
 							lastType !== TokenType.LeftBrace &&
 							lastType !== TokenType.LeftBracket &&
-							lastType !== TokenType.LeftParenthes;
+							lastType !== TokenType.LeftParenthesis;
 						let type = shouldEmitEol
 							? TokenType.EndOfLine
 							: TokenType.IrrelevantToken;

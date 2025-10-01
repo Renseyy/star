@@ -1,6 +1,5 @@
 import { loadStdl } from './star/libs/stdl';
-import { Parser } from './star/parser';
-import { Scope, type Expression } from './star/parser-old';
+import { Scope, type Expression, Parser } from './star/parser';
 import { Tokenizer } from './star/tokenizer';
 
 const tokenizer = new Tokenizer();
@@ -10,4 +9,4 @@ const tokens = tokenizer.tokenize(code);
 console.log(tokens);
 const scope = new Scope();
 const element = liner.parse(tokens, scope);
-console.dir(element, { depth: null });
+console.dir(JSON.parse(JSON.stringify(element)), { depth: null });

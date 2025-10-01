@@ -10,9 +10,9 @@ export const TokenType = {
 	Resource: 'Resource',
 
 	// (
-	LeftParenthes: 'LeftParenthes',
+	LeftParenthesis: 'LeftParenthesis',
 	//)
-	RightParenthes: 'RightParenthes',
+	RightParenthesis: 'RightParenthesis',
 
 	// [
 	LeftBracket: 'LeftBracket',
