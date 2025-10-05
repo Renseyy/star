@@ -5,7 +5,7 @@ export function isValidIdentifier(
 	const code = character.charCodeAt(0);
 	if (code == 33) return true;
 	if (code > 32 && code < 39) return true;
-	if (code == 42 || code == 43 || code == 45 || code == 47) return true;
+	if (code == 42 || code == 43 || (code > 44 && code < 48)) return true;
 	if (code == 58) return true;
 	if (code > 59 && code < 65) return true;
 	if (code == 92) return true;

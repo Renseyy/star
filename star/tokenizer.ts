@@ -169,9 +169,6 @@ export class Tokenizer {
 				this.tokens.push(
 					new Token(TokenType.RightBracket, currentChar, start)
 				);
-			} else if (currentChar == '.') {
-				this.trimBefore();
-				this.tokens.push(new Token(TokenType.Dot, currentChar, start));
 			} else if (currentChar == "'") {
 				let content = "'";
 				let finished = false;
@@ -204,6 +201,17 @@ export class Tokenizer {
 						break;
 					}
 					directive += currentChar;
+				}
+				if (directive[0] == '#') {
+					this.tokens.push(
+						new Token(
+							TokenType.MetaDirective,
+							'#' + directive,
+							start,
+							directive.substring(1)
+						)
+					);
+					continue;
 				}
 				this.tokens.push(
 					new Token(

@@ -6,6 +6,7 @@ export const TokenType = {
 	Identifier: 'Identifier',
 	String: 'String',
 	Number: 'Number',
+	MetaDirective: 'MetaDirective',
 	Directive: 'Directive',
 	Resource: 'Resource',
 
@@ -24,7 +25,6 @@ export const TokenType = {
 	//}
 	RightBrace: 'RightBrace',
 
-	Dot: 'Dot',
 	Comma: 'Comma',
 	Semicolon: 'Semicolon',
 } as const;

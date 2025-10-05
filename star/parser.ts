@@ -1,8 +1,12 @@
+import type { Block } from 'typescript';
 import type { Extrans } from './core/extrans';
 import type { Directive, HashCommands } from './directive';
-import { TokenType, type Token } from './token';
+import { Token, TokenType } from './token';
 
-export const defaultConstructorSymbol = Symbol('defaultConstructor')
+export const defaultConstructorSymbol = Symbol('defaultConstructor');
+export const defaultIntegerArchetypeSymbol = Symbol('defaultIntegerArchetype');
+export type defaultIntegerArchetypeSymbol =
+	typeof defaultIntegerArchetypeSymbol;
 
 /**
  * Add support for decorations and directives,
@@ -12,47 +16,48 @@ export const defaultConstructorSymbol = Symbol('defaultConstructor')
 export type Atom = {
 	isLineJoiner?: true;
 	isTransparent?: true;
-	type: 'Atom';
+	$type: 'Atom';
 	value: string;
 };
 
 export type Command = {
-	type: 'Command';
+	$type: 'Command';
 	constructor: ArgumentedExpression<Expression[]>;
 };
 
 export type OperatorGroup = {
 	isLineJoiner?: true;
-	type: 'OperatorGroup';
+	$type: 'OperatorGroup';
 	prefix: null | {
 		expression: ArgumentedExpression<[Expression]>;
-		bindingPower: number;
+		bindingPower: bindingPower;
 	};
 	infix: null | {
 		expression: ArgumentedExpression<[Expression, Expression]>;
-		bindingPower: number;
+		bindingPower: bindingPower;
 		isRightBinded: boolean;
 	};
 	postfix: null | {
 		expression: ArgumentedExpression<[Expression]>;
-		bindingPower: number;
+		bindingPower: bindingPower;
 	};
 };
 
 export type InfixOperator = {
-	type: 'InfixOperator';
-	bindingPower: number;
+	$type: 'InfixOperator';
+	bindingPower: bindingPower;
 	isRightBinded: boolean;
 	expression: ArgumentedExpression<[Expression, Expression]>;
 };
 
 export type ExpressionHolder = {
-	type: 'ExpressionHolder';
+	$type: 'ExpressionHolder';
 	expression: Expression;
 };
 
-export type VariableHolder = {
-	type: 'VariableHolder';
+export type Archetype = {
+	$type: 'Archetype';
+	expression: Expression;
 };
 
 export type ScopeElement =
@@ -60,18 +65,25 @@ export type ScopeElement =
 	| OperatorGroup
 	| ExpressionHolder
 	| Atom
-	| VariableHolder;
+	| Archetype;
 
 //TODO: dodać rejestr pamięci i układanie zgodnie z nim wartości
 export class Memory {
 	private registry: Record<string, string> = {};
 }
-export class Scope {
-	private id = crypto.randomUUID();
-	private registry: Record<string | symbol, ScopeElement> = {};
-	constructor(public parent?: Scope) {}
 
-	public readElement(name: string | symbol): ScopeElement | null {
+export type MetaScopeRegistry = {
+	[defaultConstructorSymbol]?: Archetype;
+	[defaultIntegerArchetypeSymbol]?: Archetype;
+} & Record<string, ScopeElement>;
+export class MetaScope {
+	private id = crypto.randomUUID();
+	private registry: MetaScopeRegistry = {};
+	constructor(public parent?: MetaScope) {}
+
+	public readElement<Key extends keyof MetaScopeRegistry>(
+		name: Key
+	): NonNullable<MetaScopeRegistry[Key]> | null {
 		if (this.registry[name]) return this.registry[name];
 		if (this.parent) return this.parent.readElement(name);
 		return null;
@@ -85,7 +97,7 @@ export class Scope {
 	 * Znajduje zasięg w którym obecnie zdefiniowana jest zmienna
 	 * @param name
 	 */
-	public declarationScope(name: string): Scope | null {
+	public declarationScope(name: string): MetaScope | null {
 		if (this.registry[name]) return this;
 		if (this.parent) return this.parent.declarationScope(name);
 		return null;
@@ -101,6 +113,31 @@ export class Scope {
 
 	public toJSON() {
 		return this.__toString();
+	}
+
+	public setDefaultConstructor(expression: Expression) {
+		this.registry[defaultConstructorSymbol] = {
+			$type: 'Archetype',
+			expression,
+		};
+	}
+
+	public getDefaultConstructor(): Expression {
+		const defaultConstructor = this.readElement(defaultConstructorSymbol);
+		if (defaultConstructor) {
+			return defaultConstructor.expression;
+		}
+		throw new Error(`No default constructor`);
+	}
+
+	public getDefaultIntegerArchetype(): Expression {
+		const defaultIntegerArchetype = this.readElement(
+			defaultIntegerArchetypeSymbol
+		);
+		if (defaultIntegerArchetype) {
+			return defaultIntegerArchetype.expression;
+		}
+		throw new Error(`No default integer archetype`);
 	}
 }
 
@@ -123,9 +160,14 @@ export type BlockExpression = {
 export type IdentifierExpression = {
 	type: 'IdentifierExpression';
 	name: string;
-	declarationScope: Scope | null;
-	locationScope: Scope;
 };
+
+export function Identifier(name: string): IdentifierExpression {
+	return {
+		type: 'IdentifierExpression',
+		name,
+	};
+}
 
 export type TemporaryOperatorExpression = {
 	type: 'TemporaryOperatorExpression';
@@ -138,6 +180,13 @@ export type GroupExpression = {
 	type: 'GroupExpression';
 	expressions: Expression[];
 };
+
+export function Group(...expressions: Expression[]): GroupExpression {
+	return {
+		type: 'GroupExpression',
+		expressions,
+	};
+}
 
 export type CallCommandExpression = {
 	type: 'CallCommandExpression';
@@ -158,15 +207,82 @@ export type Directive = {
 
 export type ScopedExpressions = {
 	type: 'ScopedExpressions';
-	scope: Scope;
+	scope: MetaScope;
 	expressions: Expression[];
 };
 
 export type Call = {
 	type: 'Call';
-	callee: Command;
-	callBlock: ScopedExpressions;
+	callee: Expression;
+	argumentBlock: Expression;
 };
+
+export function Call(callee: Expression, argumentBlock: Expression): Call {
+	return {
+		type: 'Call',
+		callee,
+		argumentBlock,
+	};
+}
+
+export type BuildExpression = {
+	type: 'BuildExpression';
+	context: Expression;
+	expressions: Expression[];
+};
+
+export type MemberOf = {
+	type: 'MemberOf';
+	parent: Expression | null;
+	member: Expression;
+};
+
+export function MemberOf(
+	parent: Expression | null,
+	member: Expression
+): MemberOf {
+	return {
+		type: 'MemberOf',
+		parent,
+		member,
+	};
+}
+
+export type TodoExpression = {
+	type: 'TodoExpression';
+	expressions: Expression[];
+};
+
+export function TodoExpression(...expressions: Expression[]): TodoExpression {
+	return {
+		type: 'TodoExpression',
+		expressions,
+	};
+}
+
+export type ArchetypeOf = {
+	type: 'ArchetypeOf';
+	expression: Expression;
+};
+
+export function ArchetypeOf(expression: Expression): ArchetypeOf {
+	return {
+		type: 'ArchetypeOf',
+		expression,
+	};
+}
+
+export type Operator = {
+	type: 'Operator';
+	name: string;
+};
+
+export function Operator(name: string): Operator {
+	return {
+		type: 'Operator',
+		name,
+	};
+}
 
 export type Expression =
 	| LiteralExpression
@@ -178,26 +294,62 @@ export type Expression =
 	| ArgumentedExpression<any>
 	| CallCommandExpression
 	| HashCommands
-	| Extrans;
+	| BuildExpression
+	| Extrans
+	| Call
+	| MemberOf
+	| TodoExpression
+	| ArchetypeOf
+	| Operator;
 
 export class Decoration {}
 
+export const maxBindingPower = Symbol();
+export type maxBindingPower = typeof maxBindingPower;
+
+export type bindingPower = number | maxBindingPower;
+
+export function isGreaterThan(a: bindingPower, b: bindingPower) {
+	if (a === b && b === maxBindingPower) return false;
+	if (a === maxBindingPower) return true;
+	if (b === maxBindingPower) return false;
+	return a > b;
+}
+
+export class ExtendedToken extends Token {
+	skipped: boolean;
+
+	public constructor(token: Token, isSkipped: boolean) {
+		super(token.type, token.text, token.index, token.content);
+		this.skipped = isSkipped;
+	}
+}
+
 // Ten parser ma za zadanie zmienić poszczególne elementy na wyrażenia - posiadając już wiedzę o odpowienich operatorach
 export class Parser {
-	private tokens: Token[] = [];
+	private tokens: ExtendedToken[] = [];
 	private index = 0;
 	public decorations: Decoration[] = [];
-	private scopes: Scope[] = [];
 
-	private getCurrentToken(forTest: true): Token | null;
-	private getCurrentToken(forTest?: false): Token;
-	private getCurrentToken(forTest: boolean = false): Token | null {
-		let token = this.tokens[this.index];
-		// Skip irrelevant tokens
-		while (token && token.type == 'IrrelevantToken') {
-			this.index++;
-			token = this.tokens[this.index];
+	// Scopes as a stack
+	private scopes: MetaScope[] = [];
+
+	private loadTokens(tokens: Token[]) {
+		let isSkipped = false;
+		for (const token of tokens) {
+			if (token.type == 'IrrelevantToken') {
+				isSkipped = true;
+				continue;
+			}
+			this.tokens.push(new ExtendedToken(token, isSkipped));
+			isSkipped = false;
 		}
+	}
+
+	private getCurrentToken(forTest: true): ExtendedToken | null;
+	private getCurrentToken(forTest?: false): ExtendedToken;
+	private getCurrentToken(forTest: boolean = false): ExtendedToken | null {
+		let token = this.tokens[this.index];
 		if (forTest) {
 			return token ?? null;
 		}
@@ -212,7 +364,7 @@ export class Parser {
 	}
 
 	private parseDirective = {
-		declare: (scope: Scope) => {
+		declare: (scope: MetaScope) => {
 			this.index++;
 			const name = this.parseElement(scope);
 			if (name.type != 'IdentifierExpression')
@@ -220,9 +372,9 @@ export class Parser {
 					`Unexpected token ${name.type}, expected IdentifierExpression`
 				);
 			const nameIdentifier = name.name;
-			scope.declare(nameIdentifier, {
-				type: 'VariableHolder',
-			});
+			// scope.declare(nameIdentifier, {
+			// 	$type: 'VariableHolder',
+			// });
 			return {
 				type: 'Directive',
 				name: 'declare',
@@ -232,10 +384,10 @@ export class Parser {
 	};
 
 	private parseBlock(
-		scope: Scope,
+		scope: MetaScope,
 		isTransparent: boolean = false
 	): BlockExpression {
-		const innerScope = isTransparent ? scope : new Scope(scope);
+		const innerScope = isTransparent ? scope : new MetaScope(scope);
 
 		// Eat {
 		this.index++;
@@ -248,14 +400,11 @@ export class Parser {
 	}
 
 	private parseCallBlock(
-		scope: Scope,
+		scope: MetaScope,
 		isTransparent: boolean = false
 	): BlockExpression {
-		const innerScope = isTransparent ? scope : new Scope(scope);
-
-		// Eat {
 		this.index++;
-		const expressions = this.parseInner(innerScope, TokenType.RightParenthesis);
+		const expressions = this.parseInner(scope, TokenType.RightParenthesis);
 		this.index++;
 		return {
 			type: 'BlockExpression',
@@ -263,35 +412,30 @@ export class Parser {
 		};
 	}
 
-	private parseIdentifier(
-		scope: Scope,
-		autoResolve: boolean = false
-	): Expression {
+	private parseIdentifier(scope: MetaScope): Expression {
 		const token = this.getCurrentToken();
 		this.index++;
 		return {
 			type: 'IdentifierExpression',
 			name: token.text,
-			declarationScope: scope.declarationScope(token.text),
-			locationScope: scope,
 		};
 	}
 
-	private parseMaybePrefixOperator(scope: Scope): null | Expression {
+	private parseMaybePrefixOperator(scope: MetaScope): null | Expression {
 		const token: Token = this.getCurrentToken();
 		const name = token.text;
 		const element = scope.readElement(name);
-		if (element?.type == 'OperatorGroup') {
+		if (element?.$type == 'OperatorGroup') {
 			if (element.prefix == null) return null;
 			const bindingPower = element.prefix.bindingPower;
 			const argument = this.parseExpression(scope, bindingPower);
 			return element.prefix.expression.creator(argument);
-		} else if (element?.type == 'Atom') {
+		} else if (element?.$type == 'Atom') {
 		}
 		return null;
 	}
 
-	private parseElement(scope: Scope): Expression {
+	private parseElement(scope: MetaScope): Expression {
 		let currentToken = this.getCurrentToken();
 		if (['Number', 'String'].includes(currentToken.type)) {
 			this.index++;
@@ -303,11 +447,12 @@ export class Parser {
 		} else if (currentToken.type == TokenType.LeftBrace) {
 			return this.parseBlock(scope);
 		} else if (currentToken.type == TokenType.LeftParenthesis) {
-			const defaultConstructor = scope.readElement(defaultConstructorSymbol);
-			if(defaultConstructor?.type != 'VariableHolder') throw new Error('Unexpected default constructor');{
-				
-			}
-		
+			const defaultConstructor = scope.getDefaultConstructor();
+			return {
+				type: 'Call',
+				callee: defaultConstructor,
+				argumentBlock: this.parseCallBlock(scope),
+			};
 		} else if (currentToken.type == 'Identifier') {
 			return (
 				this.parseMaybePrefixOperator(scope) ??
@@ -327,8 +472,8 @@ export class Parser {
 	 */
 
 	public parseExpression(
-		scope: Scope,
-		rightBindingPower: number = 0
+		scope: MetaScope,
+		rightBindingPower: bindingPower = 0
 	): Expression {
 		let left = this.parseElement(scope);
 		while (this.shouldParseInfixOrPostfix(scope)) {
@@ -348,21 +493,41 @@ export class Parser {
 					expressions,
 				};
 				continue;
-			}
-			if (token.type == TokenType.LeftParenthesis) {
-				const callee = left;
-				const scope = 
+			} else if (
+				!token.skipped &&
+				token.type == TokenType.LeftBrace &&
+				isGreaterThan(maxBindingPower, rightBindingPower)
+			) {
+				const right = this.parseBlock(scope);
+				left = {
+					type: 'BuildExpression',
+					context: left,
+					expressions: right.expressions,
+				};
+				continue;
+			} else if (
+				!token.skipped &&
+				token.type == TokenType.LeftParenthesis &&
+				isGreaterThan(maxBindingPower, rightBindingPower)
+			) {
+				const right = this.parseCallBlock(scope);
+				left = {
+					type: 'Call',
+					callee: left,
+					argumentBlock: right,
+				};
+				continue;
 			}
 			if (token.type != TokenType.Identifier) break;
 			const operatorGroup = scope.readElement(token.text);
-			if (!operatorGroup || operatorGroup.type != 'OperatorGroup') {
+			if (!operatorGroup || operatorGroup.$type != 'OperatorGroup') {
 				throw new Error(
 					'PANIC: OperatorGroup not found - add error message in future'
 				);
 			}
 			if (operatorGroup.postfix != null) {
 				const bindingPower = operatorGroup.postfix.bindingPower;
-				if (bindingPower > rightBindingPower) {
+				if (isGreaterThan(bindingPower, rightBindingPower)) {
 					left = operatorGroup.postfix.expression.creator(left);
 					this.index++;
 					continue;
@@ -371,7 +536,7 @@ export class Parser {
 			if (operatorGroup.infix != null) {
 				const bindingPower = operatorGroup.infix.bindingPower;
 				if (
-					bindingPower > rightBindingPower ||
+					isGreaterThan(bindingPower, rightBindingPower) ||
 					(bindingPower == rightBindingPower &&
 						operatorGroup.infix.isRightBinded)
 				) {
@@ -386,16 +551,25 @@ export class Parser {
 		return left;
 	}
 
-	public shouldParseInfixOrPostfix(scope: Scope): boolean {
+	public shouldParseInfixOrPostfix(scope: MetaScope): boolean {
 		const token = this.getCurrentToken(true);
 		if (!token) return false;
+		if (
+			token.type.in(
+				TokenType.Comma,
+				TokenType.LeftBrace,
+				TokenType.LeftParenthesis
+			)
+		)
+			return true;
 		if (token.type != TokenType.Identifier) return false;
 		const scopeElement = scope.readElement(token.text);
-		if (!scopeElement || scopeElement.type != 'OperatorGroup') return false;
+		if (!scopeElement || scopeElement.$type != 'OperatorGroup')
+			return false;
 		return scopeElement.postfix != null || scopeElement.infix != null;
 	}
 
-	private parseInner(scope: Scope, endType?: TokenType): Expression[] {
+	private parseInner(scope: MetaScope, endType?: TokenType): Expression[] {
 		const expressions: Expression[] = [];
 		for (
 			let token = this.getCurrentToken(true);
@@ -417,8 +591,11 @@ export class Parser {
 		return expressions;
 	}
 
-	public parse(tokens: Token[], scope: Scope = new Scope()): BlockExpression {
-		this.tokens = tokens;
+	public parse(
+		tokens: Token[],
+		scope: MetaScope = new MetaScope()
+	): BlockExpression {
+		this.loadTokens(tokens);
 		this.index = 0;
 		this.scopes.push(scope);
 		return {

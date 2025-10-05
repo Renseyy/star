@@ -1,6 +1,6 @@
-import type { Expression, Scope } from '../parser-old';
+import type { Expression, MetaScope } from '../parser';
 
-export function loadStdl(scope: Scope) {
+export function loadStdl(scope: MetaScope) {
 	const logicalNot = {
 		type: 'OperatorGroup',
 		prefix: {
