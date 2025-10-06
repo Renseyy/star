@@ -6,7 +6,7 @@ import {
 	maxBindingPower,
 	Call,
 	MemberOf,
-	ArchetypeOf,
+	MetaArchetypeOf,
 	Identifier,
 	Group,
 } from './star/parser';
@@ -62,7 +62,7 @@ scope.writeElement('+', {
 			type: 'ArgumentedExpression',
 			creator(expression: Expression): Expression {
 				return Call(
-					MemberOf(ArchetypeOf(expression), Identifier('+')),
+					MemberOf(MetaArchetypeOf(expression), Identifier('+')),
 					Group()
 				);
 			},
@@ -74,7 +74,7 @@ scope.writeElement('+', {
 			type: 'ArgumentedExpression',
 			creator(left: Expression, right: Expression): Expression {
 				return Call(
-					MemberOf(ArchetypeOf(left), Identifier('+')),
+					MemberOf(MetaArchetypeOf(left), Identifier('+')),
 					Group(right)
 				);
 			},

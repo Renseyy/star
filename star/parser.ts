@@ -260,14 +260,14 @@ export function TodoExpression(...expressions: Expression[]): TodoExpression {
 	};
 }
 
-export type ArchetypeOf = {
-	type: 'ArchetypeOf';
+export type MetaArchetypeOf = {
+	type: '#ArchetypeOf';
 	expression: Expression;
 };
 
-export function ArchetypeOf(expression: Expression): ArchetypeOf {
+export function MetaArchetypeOf(expression: Expression): MetaArchetypeOf {
 	return {
-		type: 'ArchetypeOf',
+		type: '#ArchetypeOf',
 		expression,
 	};
 }
@@ -299,7 +299,7 @@ export type Expression =
 	| Call
 	| MemberOf
 	| TodoExpression
-	| ArchetypeOf
+	| MetaArchetypeOf
 	| Operator;
 
 export class Decoration {}

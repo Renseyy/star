@@ -1,1 +1,13 @@
 1 + 2
+
+
+#Int - build in type
+#$archetype_of - gets archetype of 
+
+#@define_operator
+
+#@ - na etapie parsowania
+
+#$ - na etapie sprawdzania typów
+
+# - na etapie compilacji
