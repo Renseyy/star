@@ -36,3 +36,70 @@ Tworzy nowy archetyp. Przyjmuje dwie wartości - nazwę bazową i argumenty gene
 1) Tokenizacja [tekst -> tablica tokenów]
 2) Parsowanie [tablica tokenów -> abstrakcyjne drzewo składni] {Meta stos}
 3) Sprawdzanie 
+
+# Symbole
+> Oznaczamy je wiekimi literami
+- `#PARAMS` - oznacza miejsce w pamięci, w którym przechowywane są parametry obecnego wyrażenia
+
+- `#INFIX_OPERATOR {name}` - symbol operatora dwuargumentowego o nazwie `name`
+
+- `#PREFIX_OPERATOR {name}`
+
+- `#POSTFIX_OPERATOR {name}`
+
+- `#TRUE` - substytut wartości prawdziwej
+- `#FALSE` 
+
+# Dyrektywy parsowania
+> Wpływają na działanie podczas kompilacji  
+> Oznaczamy je przedroskiem `#@`
+
+## `#@define`
+> `symbol` `code`
+
+## `#@use`
+> `symbol` `scope`
+
+Wstawia w miejsce zdefiniowane wcześniej przy użyciu `#@define` fragment drzewa i przeprowadza jego przeparsowanie
+
+## `#@param`
+## `#$`
+> `index`  
+Odczytuje z obecnego zasięgu `#PARAMS` argument o danym indeksie a następnie przeparsowuje wynik
+
+## `#@param_pop`
+Zwraca najwyższy paraemtr iteratora `#PARAMS` w obecnym zasięgu, a następnie inkrementuje jego index
+
+
+## `#@define_archetype_operator`
+Jest skrótem dla
+
+```
+#@define_operator #@1 #@2 #@3 #call #
+```
+
+# Przykłady
+
+## Definiowanie makro
+```
+#@define #MACRO archetype_operator #call #member_of #%archetype_of #$ left #$ operator {
+    #@define #SELF #$ left
+    #@define #PARAM 0 right
+}
+```
+
+## Defitiowanie operatora
+
+```
+#@define #INFIX_OPERATOR + {
+    #@define precedence 10
+    #@define is_right_associative #TRUE
+} #@defer #@use #MACRO {
+    #@define #PARAM left $0
+    #@define #PARAM operator +
+    #@define #PARAM right $1
+}
+```
+
+
+
