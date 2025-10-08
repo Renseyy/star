@@ -5,9 +5,8 @@ import { Token, TokenType } from './token';
 
 export const defaultConstructorSymbol = Symbol('defaultConstructor');
 export const defaultIntegerArchetypeSymbol = Symbol('defaultIntegerArchetype');
-export type defaultIntegerArchetypeSymbol =
-	typeof defaultIntegerArchetypeSymbol;
-
+export type defaultIntegerArchetypeType = typeof defaultIntegerArchetypeSymbol;
+export type defaultConstructorType = typeof defaultConstructorSymbol;
 /**
  * Add support for decorations and directives,
  * - members, function calls, incontexts and indexers,
@@ -72,74 +71,16 @@ export class Memory {
 	private registry: Record<string, string> = {};
 }
 
+export type MetaScopeRegistrySymbolsType =
+	| defaultConstructorType
+	| defaultIntegerArchetypeType;
+
+export type MetaScopeRegistryKey = MetaScopeRegistrySymbolsType | string;
+
 export type MetaScopeRegistry = {
 	[defaultConstructorSymbol]?: Archetype;
 	[defaultIntegerArchetypeSymbol]?: Archetype;
-} & Record<string, ScopeElement>;
-export class MetaScope {
-	private id = crypto.randomUUID();
-	private registry: MetaScopeRegistry = {};
-	constructor(public parent?: MetaScope) {}
-
-	public readElement<Key extends keyof MetaScopeRegistry>(
-		name: Key
-	): NonNullable<MetaScopeRegistry[Key]> | null {
-		if (this.registry[name]) return this.registry[name];
-		if (this.parent) return this.parent.readElement(name);
-		return null;
-	}
-
-	public writeElement(name: string, element: ScopeElement) {
-		this.registry[name] = element;
-	}
-
-	/**
-	 * Znajduje zasięg w którym obecnie zdefiniowana jest zmienna
-	 * @param name
-	 */
-	public declarationScope(name: string): MetaScope | null {
-		if (this.registry[name]) return this;
-		if (this.parent) return this.parent.declarationScope(name);
-		return null;
-	}
-
-	public declare(name: string, element: ScopeElement): void {
-		this.registry[name] = element;
-	}
-
-	public __toString() {
-		return `Scope#${this.id}`;
-	}
-
-	public toJSON() {
-		return this.__toString();
-	}
-
-	public setDefaultConstructor(expression: Expression) {
-		this.registry[defaultConstructorSymbol] = {
-			$type: 'Archetype',
-			expression,
-		};
-	}
-
-	public getDefaultConstructor(): Expression {
-		const defaultConstructor = this.readElement(defaultConstructorSymbol);
-		if (defaultConstructor) {
-			return defaultConstructor.expression;
-		}
-		throw new Error(`No default constructor`);
-	}
-
-	public getDefaultIntegerArchetype(): Expression {
-		const defaultIntegerArchetype = this.readElement(
-			defaultIntegerArchetypeSymbol
-		);
-		if (defaultIntegerArchetype) {
-			return defaultIntegerArchetype.expression;
-		}
-		throw new Error(`No default integer archetype`);
-	}
-}
+} & Record<string, Record<string, ScopeElement>>;
 
 export type ArgumentedExpression<Args extends Expression[]> = {
 	type: 'ArgumentedExpression';
@@ -364,7 +305,7 @@ export class Parser {
 	}
 
 	private parseDirective = {
-		declare: (scope: MetaScope) => {
+		define: (scope: MetaScope) => {
 			this.index++;
 			const name = this.parseElement(scope);
 			if (name.type != 'IdentifierExpression')
@@ -372,9 +313,10 @@ export class Parser {
 					`Unexpected token ${name.type}, expected IdentifierExpression`
 				);
 			const nameIdentifier = name.name;
-			// scope.declare(nameIdentifier, {
-			// 	$type: 'VariableHolder',
-			// });
+			scope.declare(nameIdentifier, {
+				$type: 'VariableHolder',
+			});
+			const value = this.parseElement(scope);
 			return {
 				type: 'Directive',
 				name: 'declare',

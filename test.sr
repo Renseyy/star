@@ -1,13 +1,4 @@
-1 + 2
-
-
-#Int - build in type
-#$archetype_of - gets archetype of 
-
-#@define_operator
-
-#@ - na etapie parsowania
-
-#$ - na etapie sprawdzania typów
-
-# - na etapie compilacji
+#def :: #INFIX_OPERATOR {
+    #def precedence 10
+    #def is_right_associative #TRUE
+} #argumented #set_const #auto_memory #@left #@right

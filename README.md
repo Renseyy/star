@@ -91,15 +91,22 @@ Jest skrótem dla
 ## Defitiowanie operatora
 
 ```
-#@define #INFIX_OPERATOR + {
-    #@define precedence 10
-    #@define is_right_associative #TRUE
-} #@defer #@use #MACRO {
-    #@define #PARAM left $0
-    #@define #PARAM operator +
-    #@define #PARAM right $1
+#define + #INFIX_OPERATOR {
+    #define precedence 10
+    #define is_right_associative #TRUE
+} #defer #use #MACRO {
+    #define #PARAM left $0
+    #define #PARAM operator +
+    #define #PARAM right $1
 }
 ```
 
+
+```
+#def :: #INFIX_OPERATOR {
+    #def precedence 10
+    #def is_right_associative #TRUE
+} #argumented #set_const #auto_memory #@left #@right
+```
 
 
