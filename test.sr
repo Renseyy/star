@@ -1,5 +1,4 @@
-##define + #InfixOperator{
-    ##= binding_power #MAX_BINDING_POWER
-    ##= expression #deferred #member #@ operand_before #@ operand_after
-    ##= is_right_binded #FALSE
+#define + #InfixOperator{
+    #= binding_power #MAX_BINDING_POWER
+    #= is_right_binded #TRUE
 }

@@ -45,6 +45,7 @@ export type MetaRegisterShape = {
 	prefixOperator: Collection<UnaryOperator>;
 	postfixOperator: Collection<UnaryOperator>;
 	infixOperator: Collection<InfixOperator>;
+	shape: Collection<Expression>;
 };
 
 type ValueOf<T> = T[keyof T];
@@ -73,6 +74,12 @@ export type MetaRegisterKeys = {
 		? CollectionKey<Index>
 		: Key<Index>;
 };
+
+export type CollectionGroups = ValueOf<{
+	[Index in keyof MetaRegisterShape]: MetaRegisterShape[Index] extends Collection
+		? Index
+		: never;
+}>;
 
 export type MetaRegisterKey = ValueOf<MetaRegisterKeys>;
 
@@ -115,6 +122,19 @@ export class MetaRegister {
 			>;
 			return (excudingCollections as any) || null;
 		}
+		// If no $name, return the group registry itself
+	}
+	public readCollection<Group extends CollectionGroups>(
+		group: Group
+	): MetaRegisterShape[Group] | null {
+		const groupRegistry = this.registry[group];
+		if (groupRegistry == void 0) {
+			return this.parent?.readCollection(group) || null;
+		} else if (groupRegistry == null) {
+			return null;
+		}
+
+		return this.registry[group] as any;
 		// If no $name, return the group registry itself
 	}
 

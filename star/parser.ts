@@ -3,6 +3,7 @@ import type { Extrans } from './core/extrans';
 import type { Directive, HashCommands } from './directive';
 import { Token, TokenType } from './token';
 import { Key, CollectionKey, MetaRegister } from './metaRegister';
+import { staticDirectives } from './staticDirectives';
 
 export const defaultConstructorSymbol = Symbol('defaultConstructor');
 export const defaultIntegerArchetypeSymbol = Symbol('defaultIntegerArchetype');
@@ -90,97 +91,97 @@ export type MetaScopeRegistry = {
 } & Record<string, Record<string, ScopeElement>>;
 
 export type ArgumentedExpression<Args extends Expression[]> = {
-	type: 'ArgumentedExpression';
+	$: 'ArgumentedExpression';
 	creator: (...args: Args) => Expression;
 };
 
 export type LiteralExpression = {
-	type: 'LiteralExpression';
+	$: 'LiteralExpression';
 	contentType: string;
 	value: string;
 };
 
 export type BlockExpression = {
-	type: 'BlockExpression';
+	$: 'BlockExpression';
 	expressions: Expression[];
 };
 
 export type IdentifierExpression = {
-	type: 'IdentifierExpression';
+	$: 'IdentifierExpression';
 	name: string;
 };
 
 export function Identifier(name: string): IdentifierExpression {
 	return {
-		type: 'IdentifierExpression',
+		$: 'IdentifierExpression',
 		name,
 	};
 }
 
 export type TemporaryOperatorExpression = {
-	type: 'TemporaryOperatorExpression';
+	$: 'TemporaryOperatorExpression';
 	expressions: Expression[];
 	name: string;
 	info: string;
 };
 
 export type GroupExpression = {
-	type: 'GroupExpression';
+	$: 'GroupExpression';
 	expressions: Expression[];
 };
 
 export function GroupExpression(...expressions: Expression[]): GroupExpression {
 	return {
-		type: 'GroupExpression',
+		$: 'GroupExpression',
 		expressions,
 	};
 }
 
 export type CallCommandExpression = {
-	type: 'CallCommandExpression';
+	$: 'CallCommandExpression';
 	command: Command;
 	arguments: Expression[];
 };
 
 export type UnresolvedExpression = {
-	type: 'UnresolvedExpression';
+	$: 'UnresolvedExpression';
 	resolve: (...args: Expression[]) => Expression;
 };
 
 export type Directive = {
-	type: 'Directive';
+	$: 'Directive';
 	name: string;
 	arguments: Expression[];
 };
 
 export type ScopedExpressions = {
-	type: 'ScopedExpressions';
+	$: 'ScopedExpressions';
 	scope: MetaRegister;
 	expressions: Expression[];
 };
 
 export type Call = {
-	type: 'Call';
+	$: 'Call';
 	callee: Expression;
 	argumentBlock: Expression;
 };
 
 export function Call(callee: Expression, argumentBlock: Expression): Call {
 	return {
-		type: 'Call',
+		$: 'Call',
 		callee,
 		argumentBlock,
 	};
 }
 
 export type BuildExpression = {
-	type: 'BuildExpression';
+	$: 'BuildExpression';
 	context: Expression;
 	expressions: Expression[];
 };
 
 export type MemberOf = {
-	type: 'MemberOf';
+	$: 'MemberOf';
 	parent: Expression | null;
 	member: Expression;
 };
@@ -190,49 +191,49 @@ export function MemberOf(
 	member: Expression
 ): MemberOf {
 	return {
-		type: 'MemberOf',
+		$: 'MemberOf',
 		parent,
 		member,
 	};
 }
 
 export type TodoExpression = {
-	type: 'TodoExpression';
+	$: 'TodoExpression';
 	expressions: Expression[];
 };
 
 export function TodoExpression(...expressions: Expression[]): TodoExpression {
 	return {
-		type: 'TodoExpression',
+		$: 'TodoExpression',
 		expressions,
 	};
 }
 
 export type MetaArchetypeOf = {
-	type: '#ArchetypeOf';
+	$: '#ArchetypeOf';
 	expression: Expression;
 };
 
 export function MetaArchetypeOf(expression: Expression): MetaArchetypeOf {
 	return {
-		type: '#ArchetypeOf',
+		$: '#ArchetypeOf',
 		expression,
 	};
 }
 
 export type Operator = {
-	type: 'Operator';
+	$: 'Operator';
 	name: string;
 };
 
 export function Operator(name: string): Operator {
 	return {
-		type: 'Operator',
+		$: 'Operator',
 		name,
 	};
 }
 
-export type Expression =
+export type Expression = (
 	| LiteralExpression
 	| BlockExpression
 	| GroupExpression
@@ -248,7 +249,8 @@ export type Expression =
 	| MemberOf
 	| TodoExpression
 	| MetaArchetypeOf
-	| Operator;
+	| Operator
+) & { $: string };
 
 export class Decoration {}
 
@@ -291,9 +293,9 @@ export class Parser {
 		}
 	}
 
-	private getCurrentToken(forTest: true): ExtendedToken | null;
-	private getCurrentToken(forTest?: false): ExtendedToken;
-	private getCurrentToken(forTest: boolean = false): ExtendedToken | null {
+	public getCurrentToken(forTest: true): ExtendedToken | null;
+	public getCurrentToken(forTest?: false): ExtendedToken;
+	public getCurrentToken(forTest: boolean = false): ExtendedToken | null {
 		let token = this.tokens[this.index];
 		if (forTest) {
 			return token ?? null;
@@ -304,7 +306,7 @@ export class Parser {
 		return token;
 	}
 
-	private hasToken(): boolean {
+	public hasToken(): boolean {
 		return this.index < this.tokens.length;
 	}
 
@@ -312,9 +314,9 @@ export class Parser {
 		define: (register: MetaRegister) => {
 			this.index++;
 			const name = this.parseElement(register);
-			if (name.type != 'IdentifierExpression')
+			if (name.$ != 'IdentifierExpression')
 				throw new Error(
-					`Unexpected token ${name.type}, expected IdentifierExpression`
+					`Unexpected token ${name.$}, expected IdentifierExpression`
 				);
 			const nameIdentifier = name.name;
 
@@ -325,9 +327,10 @@ export class Parser {
 				arguments: [name],
 			};
 		},
+		...staticDirectives(this),
 	};
 
-	private parseBlock(
+	public parseBlock(
 		register: MetaRegister,
 		isTransparent: boolean = false
 	): BlockExpression {
@@ -343,9 +346,15 @@ export class Parser {
 		);
 		this.index++;
 		return {
-			type: 'BlockExpression',
+			$: 'BlockExpression',
 			expressions: expressions,
 		};
+	}
+
+	public parseScope(register: MetaRegister): MetaRegister {
+		const innerRegister = new MetaRegister(register);
+		this.parseBlock(innerRegister, true);
+		return innerRegister;
 	}
 
 	private parseCallBlock(
@@ -359,7 +368,7 @@ export class Parser {
 		);
 		this.index++;
 		return {
-			type: 'BlockExpression',
+			$: 'BlockExpression',
 			expressions: expressions,
 		};
 	}
@@ -368,7 +377,7 @@ export class Parser {
 		const token = this.getCurrentToken();
 		this.index++;
 		return {
-			type: 'IdentifierExpression',
+			$: 'IdentifierExpression',
 			name: token.text,
 		};
 	}
@@ -389,12 +398,12 @@ export class Parser {
 		return null;
 	}
 
-	private parseElement(register: MetaRegister): Expression {
+	public parseElement(register: MetaRegister): Expression {
 		let currentToken = this.getCurrentToken();
 		if (['Number', 'String'].includes(currentToken.type)) {
 			this.index++;
 			return {
-				type: 'LiteralExpression',
+				$: 'LiteralExpression',
 				contentType: currentToken.type,
 				value: currentToken.content || currentToken.text,
 			};
@@ -408,7 +417,7 @@ export class Parser {
 				throw new Error('Cannot get default constructor');
 			}
 			return {
-				type: 'Call',
+				$: 'Call',
 				callee: defaultConstructor,
 				argumentBlock: this.parseCallBlock(register),
 			};
@@ -420,6 +429,7 @@ export class Parser {
 		} else if (currentToken.type == TokenType.Directive) {
 			const parseFunction = this.parseDirective[currentToken.content];
 			if (parseFunction) {
+				this.index++;
 				return parseFunction(register);
 			}
 			throw new Error('Undefined directive ' + currentToken.content);
@@ -442,13 +452,13 @@ export class Parser {
 				const expressions = [left];
 				this.index++;
 				const right = this.parseExpression(register);
-				if (right.type == 'GroupExpression') {
+				if (right.$ == 'GroupExpression') {
 					expressions.push(...right.expressions);
 				} else {
 					expressions.push(right);
 				}
 				left = {
-					type: 'GroupExpression',
+					$: 'GroupExpression',
 					expressions,
 				};
 				continue;
@@ -459,7 +469,7 @@ export class Parser {
 			) {
 				const right = this.parseBlock(register);
 				left = {
-					type: 'BuildExpression',
+					$: 'BuildExpression',
 					context: left,
 					expressions: right.expressions,
 				};
@@ -471,7 +481,7 @@ export class Parser {
 			) {
 				const right = this.parseCallBlock(register);
 				left = {
-					type: 'Call',
+					$: 'Call',
 					callee: left,
 					argumentBlock: right,
 				};
@@ -542,7 +552,7 @@ export class Parser {
 			token != null && (!endType || token.type != endType);
 			token = this.getCurrentToken(true)
 		) {
-			const expression = this.parseExpression(scope);
+			const expression = this.parseExpression(register);
 			expressions.push(expression);
 			if (!endType) {
 				if (!this.hasToken()) break;
@@ -564,7 +574,7 @@ export class Parser {
 		this.loadTokens(tokens);
 		this.index = 0;
 		return {
-			type: 'BlockExpression',
+			$: 'BlockExpression',
 			expressions: this.parseInner(register),
 		};
 	}

@@ -19,17 +19,17 @@ const tokens = tokenizer.tokenize(code);
 console.log(tokens);
 const scope = new MetaRegister();
 scope.writeElement(Key('defaultConstructorArchetype'), {
-	type: 'IdentifierExpression',
+	$: 'IdentifierExpression',
 	name: 'Function',
 });
 scope.writeElement(CollectionKey('infixOperator', '.'), {
 	$: 'InfixOperator',
 	bindingPower: maxBindingPower,
 	expression: {
-		type: 'ArgumentedExpression',
+		$: 'ArgumentedExpression',
 		creator(parent: Expression, member: Expression): Expression {
 			return {
-				type: 'MemberExpression',
+				$: 'MemberExpression',
 				parent,
 				member,
 			};
@@ -45,7 +45,7 @@ scope.writeElement('.', {
 			type: 'ArgumentedExpression',
 			creator(expression: Expression): Expression {
 				return {
-					type: 'MemberExpression',
+					$: 'MemberExpression',
 					parent: null,
 					member: expression,
 				};
@@ -58,7 +58,7 @@ scope.writeElement('.', {
 			type: 'ArgumentedExpression',
 			creator(parent: Expression, member: Expression): Expression {
 				return {
-					type: 'MemberExpression',
+					$: 'MemberExpression',
 					parent,
 					member,
 				};

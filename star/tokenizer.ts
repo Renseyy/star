@@ -197,21 +197,10 @@ export class Tokenizer {
 						break;
 					}
 					currentChar = this.getChar();
-					if (isSpace(currentChar)) {
+					if (isSpace(currentChar) || currentChar == '{') {
 						break;
 					}
 					directive += currentChar;
-				}
-				if (directive[0] == '#') {
-					this.tokens.push(
-						new Token(
-							TokenType.MetaDirective,
-							'#' + directive,
-							start,
-							directive.substring(1)
-						)
-					);
-					continue;
 				}
 				this.tokens.push(
 					new Token(
