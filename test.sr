@@ -1,4 +1,5 @@
-#def :: #INFIX_OPERATOR {
-    #def precedence 10
-    #def is_right_associative #TRUE
-} #argumented #set_const #auto_memory #@left #@right
+##define + #InfixOperator{
+    ##= binding_power #MAX_BINDING_POWER
+    ##= expression #deferred #member #@ operand_before #@ operand_after
+    ##= is_right_binded #FALSE
+}

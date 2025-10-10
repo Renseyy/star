@@ -2,6 +2,7 @@ import type { Block } from 'typescript';
 import type { Extrans } from './core/extrans';
 import type { Directive, HashCommands } from './directive';
 import { Token, TokenType } from './token';
+import { Key, CollectionKey, MetaRegister } from './metaRegister';
 
 export const defaultConstructorSymbol = Symbol('defaultConstructor');
 export const defaultIntegerArchetypeSymbol = Symbol('defaultIntegerArchetype');
@@ -42,8 +43,14 @@ export type OperatorGroup = {
 	};
 };
 
+export type UnaryOperator = {
+	$: 'UnaryOperator';
+	bindingPower: bindingPower;
+	expression: ArgumentedExpression<[Expression]>;
+};
+
 export type InfixOperator = {
-	$type: 'InfixOperator';
+	$: 'InfixOperator';
 	bindingPower: bindingPower;
 	isRightBinded: boolean;
 	expression: ArgumentedExpression<[Expression, Expression]>;
@@ -122,7 +129,7 @@ export type GroupExpression = {
 	expressions: Expression[];
 };
 
-export function Group(...expressions: Expression[]): GroupExpression {
+export function GroupExpression(...expressions: Expression[]): GroupExpression {
 	return {
 		type: 'GroupExpression',
 		expressions,
@@ -148,7 +155,7 @@ export type Directive = {
 
 export type ScopedExpressions = {
 	type: 'ScopedExpressions';
-	scope: MetaScope;
+	scope: MetaRegister;
 	expressions: Expression[];
 };
 
@@ -272,9 +279,6 @@ export class Parser {
 	private index = 0;
 	public decorations: Decoration[] = [];
 
-	// Scopes as a stack
-	private scopes: MetaScope[] = [];
-
 	private loadTokens(tokens: Token[]) {
 		let isSkipped = false;
 		for (const token of tokens) {
@@ -305,18 +309,16 @@ export class Parser {
 	}
 
 	private parseDirective = {
-		define: (scope: MetaScope) => {
+		define: (register: MetaRegister) => {
 			this.index++;
-			const name = this.parseElement(scope);
+			const name = this.parseElement(register);
 			if (name.type != 'IdentifierExpression')
 				throw new Error(
 					`Unexpected token ${name.type}, expected IdentifierExpression`
 				);
 			const nameIdentifier = name.name;
-			scope.declare(nameIdentifier, {
-				$type: 'VariableHolder',
-			});
-			const value = this.parseElement(scope);
+
+			const value = this.parseElement(register);
 			return {
 				type: 'Directive',
 				name: 'declare',
@@ -326,14 +328,19 @@ export class Parser {
 	};
 
 	private parseBlock(
-		scope: MetaScope,
+		register: MetaRegister,
 		isTransparent: boolean = false
 	): BlockExpression {
-		const innerScope = isTransparent ? scope : new MetaScope(scope);
+		const innerRegister = isTransparent
+			? register
+			: new MetaRegister(register);
 
 		// Eat {
 		this.index++;
-		const expressions = this.parseInner(innerScope, TokenType.RightBrace);
+		const expressions = this.parseInner(
+			innerRegister,
+			TokenType.RightBrace
+		);
 		this.index++;
 		return {
 			type: 'BlockExpression',
@@ -342,11 +349,14 @@ export class Parser {
 	}
 
 	private parseCallBlock(
-		scope: MetaScope,
+		register: MetaRegister,
 		isTransparent: boolean = false
 	): BlockExpression {
 		this.index++;
-		const expressions = this.parseInner(scope, TokenType.RightParenthesis);
+		const expressions = this.parseInner(
+			register,
+			TokenType.RightParenthesis
+		);
 		this.index++;
 		return {
 			type: 'BlockExpression',
@@ -354,7 +364,7 @@ export class Parser {
 		};
 	}
 
-	private parseIdentifier(scope: MetaScope): Expression {
+	private parseIdentifier(): Expression {
 		const token = this.getCurrentToken();
 		this.index++;
 		return {
@@ -363,21 +373,23 @@ export class Parser {
 		};
 	}
 
-	private parseMaybePrefixOperator(scope: MetaScope): null | Expression {
+	private parseMaybePrefixOperator(
+		register: MetaRegister
+	): null | Expression {
 		const token: Token = this.getCurrentToken();
 		const name = token.text;
-		const element = scope.readElement(name);
-		if (element?.$type == 'OperatorGroup') {
-			if (element.prefix == null) return null;
-			const bindingPower = element.prefix.bindingPower;
-			const argument = this.parseExpression(scope, bindingPower);
-			return element.prefix.expression.creator(argument);
-		} else if (element?.$type == 'Atom') {
-		}
+		const prefixOperator = register.readElement(
+			CollectionKey('prefixOperator', name)
+		);
+		if (prefixOperator) {
+			const bindingPower = prefixOperator.bindingPower;
+			const argument = this.parseExpression(register, bindingPower);
+			return prefixOperator.expression.creator(argument);
+		} // Ad support for atoms
 		return null;
 	}
 
-	private parseElement(scope: MetaScope): Expression {
+	private parseElement(register: MetaRegister): Expression {
 		let currentToken = this.getCurrentToken();
 		if (['Number', 'String'].includes(currentToken.type)) {
 			this.index++;
@@ -387,23 +399,28 @@ export class Parser {
 				value: currentToken.content || currentToken.text,
 			};
 		} else if (currentToken.type == TokenType.LeftBrace) {
-			return this.parseBlock(scope);
+			return this.parseBlock(register);
 		} else if (currentToken.type == TokenType.LeftParenthesis) {
-			const defaultConstructor = scope.getDefaultConstructor();
+			const defaultConstructor = register.readElement(
+				Key('defaultConstructorArchetype')
+			);
+			if (!defaultConstructor) {
+				throw new Error('Cannot get default constructor');
+			}
 			return {
 				type: 'Call',
 				callee: defaultConstructor,
-				argumentBlock: this.parseCallBlock(scope),
+				argumentBlock: this.parseCallBlock(register),
 			};
 		} else if (currentToken.type == 'Identifier') {
 			return (
-				this.parseMaybePrefixOperator(scope) ??
-				this.parseIdentifier(scope)
+				this.parseMaybePrefixOperator(register) ??
+				this.parseIdentifier()
 			);
 		} else if (currentToken.type == TokenType.Directive) {
 			const parseFunction = this.parseDirective[currentToken.content];
 			if (parseFunction) {
-				return parseFunction(scope);
+				return parseFunction(register);
 			}
 			throw new Error('Undefined directive ' + currentToken.content);
 		}
@@ -414,17 +431,17 @@ export class Parser {
 	 */
 
 	public parseExpression(
-		scope: MetaScope,
+		register: MetaRegister,
 		rightBindingPower: bindingPower = 0
 	): Expression {
-		let left = this.parseElement(scope);
-		while (this.shouldParseInfixOrPostfix(scope)) {
+		let left = this.parseElement(register);
+		while (this.shouldParseInfixOrPostfix(register)) {
 			const token = this.getCurrentToken(true);
 			if (!token) break;
 			if (token.type == TokenType.Comma) {
 				const expressions = [left];
 				this.index++;
-				const right = this.parseExpression(scope);
+				const right = this.parseExpression(register);
 				if (right.type == 'GroupExpression') {
 					expressions.push(...right.expressions);
 				} else {
@@ -440,7 +457,7 @@ export class Parser {
 				token.type == TokenType.LeftBrace &&
 				isGreaterThan(maxBindingPower, rightBindingPower)
 			) {
-				const right = this.parseBlock(scope);
+				const right = this.parseBlock(register);
 				left = {
 					type: 'BuildExpression',
 					context: left,
@@ -452,7 +469,7 @@ export class Parser {
 				token.type == TokenType.LeftParenthesis &&
 				isGreaterThan(maxBindingPower, rightBindingPower)
 			) {
-				const right = this.parseCallBlock(scope);
+				const right = this.parseCallBlock(register);
 				left = {
 					type: 'Call',
 					callee: left,
@@ -461,30 +478,30 @@ export class Parser {
 				continue;
 			}
 			if (token.type != TokenType.Identifier) break;
-			const operatorGroup = scope.readElement(token.text);
-			if (!operatorGroup || operatorGroup.$type != 'OperatorGroup') {
-				throw new Error(
-					'PANIC: OperatorGroup not found - add error message in future'
-				);
-			}
-			if (operatorGroup.postfix != null) {
-				const bindingPower = operatorGroup.postfix.bindingPower;
+			const postfixOperator = register.readElement(
+				CollectionKey('prefixOperator', token.text)
+			);
+			if (postfixOperator != null) {
+				const bindingPower = postfixOperator.bindingPower;
 				if (isGreaterThan(bindingPower, rightBindingPower)) {
-					left = operatorGroup.postfix.expression.creator(left);
+					left = postfixOperator.expression.creator(left);
 					this.index++;
 					continue;
 				}
 			}
-			if (operatorGroup.infix != null) {
-				const bindingPower = operatorGroup.infix.bindingPower;
+			const infixOperator = register.readElement(
+				CollectionKey('infixOperator', token.text)
+			);
+			if (infixOperator != null) {
+				const bindingPower = infixOperator.bindingPower;
 				if (
 					isGreaterThan(bindingPower, rightBindingPower) ||
 					(bindingPower == rightBindingPower &&
-						operatorGroup.infix.isRightBinded)
+						infixOperator.isRightBinded)
 				) {
 					this.index++;
-					const right = this.parseExpression(scope, bindingPower);
-					left = operatorGroup.infix.expression.creator(left, right);
+					const right = this.parseExpression(register, bindingPower);
+					left = infixOperator.expression.creator(left, right);
 					continue;
 				}
 			}
@@ -493,7 +510,7 @@ export class Parser {
 		return left;
 	}
 
-	public shouldParseInfixOrPostfix(scope: MetaScope): boolean {
+	public shouldParseInfixOrPostfix(register: MetaRegister): boolean {
 		const token = this.getCurrentToken(true);
 		if (!token) return false;
 		if (
@@ -505,13 +522,20 @@ export class Parser {
 		)
 			return true;
 		if (token.type != TokenType.Identifier) return false;
-		const scopeElement = scope.readElement(token.text);
-		if (!scopeElement || scopeElement.$type != 'OperatorGroup')
-			return false;
-		return scopeElement.postfix != null || scopeElement.infix != null;
+		const infixOperator = register.readElement(
+			CollectionKey('infixOperator', token.text)
+		);
+		if (infixOperator != null) return true;
+		const postfixOperator = register.readElement(
+			CollectionKey('postfixOperator', token.text)
+		);
+		return postfixOperator != null;
 	}
 
-	private parseInner(scope: MetaScope, endType?: TokenType): Expression[] {
+	private parseInner(
+		register: MetaRegister,
+		endType?: TokenType
+	): Expression[] {
 		const expressions: Expression[] = [];
 		for (
 			let token = this.getCurrentToken(true);
@@ -535,14 +559,13 @@ export class Parser {
 
 	public parse(
 		tokens: Token[],
-		scope: MetaScope = new MetaScope()
+		register: MetaRegister = new MetaRegister()
 	): BlockExpression {
 		this.loadTokens(tokens);
 		this.index = 0;
-		this.scopes.push(scope);
 		return {
 			type: 'BlockExpression',
-			expressions: this.parseInner(scope),
+			expressions: this.parseInner(register),
 		};
 	}
 }

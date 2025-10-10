@@ -1,6 +1,6 @@
 import { loadStdl } from './star/libs/stdl';
+import { Key, CollectionKey, MetaRegister } from './star/metaRegister';
 import {
-	MetaScope,
 	type Expression,
 	Parser,
 	maxBindingPower,
@@ -8,7 +8,7 @@ import {
 	MemberOf,
 	MetaArchetypeOf,
 	Identifier,
-	Group,
+	GroupExpression,
 } from './star/parser';
 import { Tokenizer } from './star/tokenizer';
 
@@ -17,10 +17,25 @@ const liner = new Parser();
 const code = await Bun.file('./test.sr').text();
 const tokens = tokenizer.tokenize(code);
 console.log(tokens);
-const scope = new MetaScope();
-scope.setDefaultConstructor({
+const scope = new MetaRegister();
+scope.writeElement(Key('defaultConstructorArchetype'), {
 	type: 'IdentifierExpression',
 	name: 'Function',
+});
+scope.writeElement(CollectionKey('infixOperator', '.'), {
+	$: 'InfixOperator',
+	bindingPower: maxBindingPower,
+	expression: {
+		type: 'ArgumentedExpression',
+		creator(parent: Expression, member: Expression): Expression {
+			return {
+				type: 'MemberExpression',
+				parent,
+				member,
+			};
+		},
+	},
+	isRightBinded: false,
 });
 scope.writeElement('.', {
 	$type: 'OperatorGroup',
@@ -63,7 +78,7 @@ scope.writeElement('+', {
 			creator(expression: Expression): Expression {
 				return Call(
 					MemberOf(MetaArchetypeOf(expression), Identifier('+')),
-					Group()
+					GroupExpression()
 				);
 			},
 		},
@@ -75,7 +90,7 @@ scope.writeElement('+', {
 			creator(left: Expression, right: Expression): Expression {
 				return Call(
 					MemberOf(MetaArchetypeOf(left), Identifier('+')),
-					Group(right)
+					GroupExpression(right)
 				);
 			},
 		},

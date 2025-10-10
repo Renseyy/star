@@ -8,7 +8,10 @@ import type { ArchetypeElement } from './metaRegisterElement';
 import {
 	defaultConstructorSymbol,
 	type Archetype,
+	type Expression,
+	type InfixOperator,
 	type MetaScopeRegistrySymbolsType,
+	type UnaryOperator,
 } from './parser';
 
 type MetaRegisterGroups =
@@ -34,41 +37,41 @@ export function Collection<Inner extends any = any>(
 }
 
 export type MetaRegisterShape = {
-	defaultIntegerArchetype: ArchetypeElement;
-	defaultFloatArchetype: ArchetypeElement;
-	defaultStringArchetype: ArchetypeElement;
-	defaultConstructorArchetype: ArchetypeElement;
-	defaultIndexerArchetype: ArchetypeElement;
-	prefixOperator: ArchetypeElement;
-	postfixOperator: Collection<string>;
-	infixOperator: Collection<ArchetypeElement>;
+	defaultIntegerArchetype: Expression;
+	defaultFloatArchetype: Expression;
+	defaultStringArchetype: Expression;
+	defaultConstructorArchetype: Expression;
+	defaultIndexerArchetype: Expression;
+	prefixOperator: Collection<UnaryOperator>;
+	postfixOperator: Collection<UnaryOperator>;
+	infixOperator: Collection<InfixOperator>;
 };
 
 type ValueOf<T> = T[keyof T];
-export type Group<T extends string> = { group: T; $: 'Group' };
-export function Group<T extends string>(group: T): Readonly<Group<T>> {
+export type Key<T extends string> = { group: T; $: 'Group' };
+export function Key<T extends string>(group: T): Readonly<Key<T>> {
 	return {
 		group,
 		$: 'Group',
 	};
 }
-export type GroupWithName<T> = { group: T; name: string; $: 'GroupWithName' };
-export function GroupWithName<T extends string>(
+export type CollectionKey<T> = { group: T; name: string; $: 'GroupWithName' };
+export function CollectionKey<T extends string>(
 	group: T,
 	name: string
-): Readonly<GroupWithName<T>> {
+): Readonly<CollectionKey<T>> {
 	return {
 		group,
 		name,
 		$: 'GroupWithName',
 	};
 }
-export type AnyGroup<T extends string> = Group<T> | GroupWithName<T>;
+export type AnyGroup<T extends string> = Key<T> | CollectionKey<T>;
 
 export type MetaRegisterKeys = {
-	[Key in keyof MetaRegisterShape]: MetaRegisterShape[Key] extends Collection
-		? GroupWithName<Key>
-		: Group<Key>;
+	[Index in keyof MetaRegisterShape]: MetaRegisterShape[Index] extends Collection
+		? CollectionKey<Index>
+		: Key<Index>;
 };
 
 export type MetaRegisterKey = ValueOf<MetaRegisterKeys>;
@@ -140,5 +143,5 @@ export class MetaRegister {
 }
 
 const metaRegister = new MetaRegister();
-const someType = metaRegister.readElement(GroupWithName('infixOperator', '!'));
-metaRegister.writeElement(Group('defaultConstructorArchetype'),);
+const someType = metaRegister.readElement(CollectionKey('infixOperator', '!'));
+metaRegister.writeElement(Key('defaultConstructorArchetype'));
