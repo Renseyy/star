@@ -4,7 +4,7 @@
  * Rejestr jest także przydatny przy `wyrażeniach uargumentowanych`, gdzie służy do przekazywania parametrów
  */
 
-import type { ArchetypeElement } from './metaRegisterElement';
+import type { ArchetypeElement, MemoryElement } from './metaRegisterElement';
 import {
 	defaultConstructorSymbol,
 	type Archetype,
@@ -15,11 +15,10 @@ import {
 } from './parser';
 
 type MetaRegisterGroups =
-	| 'defaultIntegerArchetype'
-	| 'defaultFloatArchetype'
-	| 'defaultStringArchetype'
-	| 'defaultConstructorArchetype'
-	| 'defaultIndexerArchetype'
+	| 'defaultInteger'
+	| 'defaultFloat'
+	| 'defaultString'
+	| 'defaultConstructor'
 	| 'prefixOperator'
 	| 'postfixOperator'
 	| 'infixOperator';
@@ -45,6 +44,8 @@ export type MetaRegisterShape = {
 	prefixOperator: Collection<UnaryOperator>;
 	postfixOperator: Collection<UnaryOperator>;
 	infixOperator: Collection<InfixOperator>;
+	archetype: Collection<Archetype>;
+	variable: Collection<MemoryElement>;
 	shape: Collection<Expression>;
 };
 
@@ -93,6 +94,7 @@ export type MetaRegisterValues = {
 
 export type ExcludeCollections<T> = T extends Collection ? never : T;
 export type OnlyCollections<T> = T extends Collection ? T : never;
+
 export class MetaRegister {
 	private id = crypto.randomUUID();
 	private registry: Partial<MetaRegisterShape> = {};

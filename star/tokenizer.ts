@@ -132,10 +132,10 @@ export class Tokenizer {
 			const start = this.index;
 			let currentChar = this.getChar();
 			if (currentChar == ',') {
-				this.pushToken(new Token(TokenType.Comma, currentChar, start));
+				this.pushToken(Token(TokenType.Comma, currentChar, start));
 			} else if (currentChar == '(') {
 				this.pushToken(
-					new Token(TokenType.LeftParenthesis, currentChar, start),
+					Token(TokenType.LeftParenthesis, currentChar, start),
 					true
 				);
 			} else if (currentChar == ')') {
@@ -145,29 +145,27 @@ export class Tokenizer {
 					TokenType.RightParenthesis
 				);
 				this.pushToken(
-					new Token(TokenType.RightParenthesis, currentChar, start)
+					Token(TokenType.RightParenthesis, currentChar, start)
 				);
 			} else if (currentChar == '{') {
 				this.pushToken(
-					new Token(TokenType.LeftBrace, currentChar, start),
+					Token(TokenType.LeftBrace, currentChar, start),
 					true
 				);
 			} else if (currentChar == '}') {
 				this.trimBefore();
 				this.expect(TokenType.LeftBrace, TokenType.RightBrace);
-				this.pushToken(
-					new Token(TokenType.RightBrace, currentChar, start)
-				);
+				this.pushToken(Token(TokenType.RightBrace, currentChar, start));
 			} else if (currentChar == '[') {
 				this.pushToken(
-					new Token(TokenType.LeftBracket, currentChar, start),
+					Token(TokenType.LeftBracket, currentChar, start),
 					true
 				);
 			} else if (currentChar == ']') {
 				this.trimBefore();
 				this.expect(TokenType.LeftBracket, TokenType.RightBracket);
 				this.tokens.push(
-					new Token(TokenType.RightBracket, currentChar, start)
+					Token(TokenType.RightBracket, currentChar, start)
 				);
 			} else if (currentChar == "'") {
 				let content = "'";
@@ -188,7 +186,7 @@ export class Tokenizer {
 				if (!finished) {
 					this.reportError('Unterminated string started at ' + start);
 				}
-				this.tokens.push(new Token(TokenType.String, content, start));
+				this.tokens.push(Token(TokenType.String, content, start));
 				continue;
 			} else if (currentChar == '#') {
 				let directive = '';
@@ -203,7 +201,7 @@ export class Tokenizer {
 					directive += currentChar;
 				}
 				this.tokens.push(
-					new Token(
+					Token(
 						TokenType.Directive,
 						'#' + directive,
 						start,
@@ -236,32 +234,33 @@ export class Tokenizer {
 						let type = shouldEmitEol
 							? TokenType.EndOfLine
 							: TokenType.IrrelevantToken;
-						console.table({
-							isLastToken,
-							isFirstToken,
-							lastType,
-							tokenBefore: tokenBefore?.type,
-							shouldEmitEol,
-							type,
-							canAppend,
-						});
 						if (canAppend) {
 							const token = tokenBefore as Token;
 							token.text += '\n';
 							token.type = type;
 							this.tokens[this.tokens.length - 1] = token;
 						} else {
-							const token = new Token(type, '\n', start);
+							const token = Token(type, '\n', start, 'newline');
 							this.tokens.push(token);
 						}
 					} else {
-						this.tokens.push(
-							new Token(
-								TokenType.IrrelevantToken,
-								currentChar,
-								start
-							)
-						);
+						const tokenBefore = this.tokens.last();
+						if (
+							tokenBefore &&
+							tokenBefore.type == TokenType.IrrelevantToken &&
+							tokenBefore.content == 'space'
+						) {
+							tokenBefore.text += currentChar;
+							this.tokens[this.tokens.length - 1] = tokenBefore;
+						} else
+							this.tokens.push(
+								Token(
+									TokenType.IrrelevantToken,
+									currentChar,
+									start,
+									'space'
+								)
+							);
 					}
 				} else if (isDigit(currentChar)) {
 					let number = currentChar;
@@ -271,9 +270,7 @@ export class Tokenizer {
 						if (!isDigit(currentChar)) break;
 						number += currentChar;
 					}
-					this.tokens.push(
-						new Token(TokenType.Number, number, start)
-					);
+					this.tokens.push(Token(TokenType.Number, number, start));
 					continue;
 				} else if (isValidIdentifier(currentChar)) {
 					let text = currentChar;
@@ -286,9 +283,9 @@ export class Tokenizer {
 						}
 						break;
 					}
-					this.tokens.push(
-						new Token(TokenType.Identifier, text, start)
-					);
+					const token = Token(TokenType.Identifier, text, start);
+					token.operatorSet = true;
+					this.tokens.push(token);
 					continue;
 				} else if (isValidAlphaNumericIdentifier(currentChar, false)) {
 					let text = currentChar;
@@ -301,16 +298,14 @@ export class Tokenizer {
 						}
 						break;
 					}
-					this.tokens.push(
-						new Token(TokenType.Identifier, text, start)
-					);
+					this.tokens.push(Token(TokenType.Identifier, text, start));
 					continue;
 				} else {
 					this.reportError(
 						`Unexpected character "${currentChar}" at index ${start}`
 					);
 					this.tokens.push(
-						new Token(TokenType.InvalidToken, currentChar, start)
+						Token(TokenType.InvalidToken, currentChar, start)
 					);
 				}
 			}

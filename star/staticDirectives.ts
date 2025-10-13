@@ -13,19 +13,15 @@ export function staticDirectives(parser: Parser) {
 		InfixOperator: (register: MetaRegister): InfixOperator => {
 			const scope = parser.parseScope(register);
 			const collection = scope.readCollection('shape');
-			console.log(collection);
-			throw new Error('not implemented');
+			if (!collection) throw new Error('Cannot get shape');
+			const bindingPower = collection.binding_power.value;
+			const isRightBinded = collection.is_right_binded.value;
+			const creator = collection.creator;
 			return {
 				$: 'InfixOperator',
-				bindingPower: parser.maxBindingPower,
-				expression: {
-					$: 'ArgumentedExpression',
-					expressions: [
-						parser.parseExpression(),
-						parser.parseExpression(),
-					],
-				},
-				isRightBinded: false,
+				bindingPower,
+				expression: creator,
+				isRightBinded,
 			};
 		},
 		'=': (register: MetaRegister) => {
@@ -65,5 +61,10 @@ export function staticDirectives(parser: Parser) {
 			contentType: 'Boolean',
 			value: true,
 		}),
+		indexer: (register: MetaRegister) => {
+			return {
+				$: 'Indexer',
+			};
+		},
 	} as const;
 }

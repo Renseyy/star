@@ -5,7 +5,6 @@ import {
 	Parser,
 	maxBindingPower,
 	Call,
-	MemberOf,
 	MetaArchetypeOf,
 	Identifier,
 	GroupExpression,
@@ -17,86 +16,7 @@ const liner = new Parser();
 const code = await Bun.file('./test.sr').text();
 const tokens = tokenizer.tokenize(code);
 console.log(tokens);
-const scope = new MetaRegister();
-scope.writeElement(Key('defaultConstructorArchetype'), {
-	$: 'IdentifierExpression',
-	name: 'Function',
-});
-scope.writeElement(CollectionKey('infixOperator', '.'), {
-	$: 'InfixOperator',
-	bindingPower: maxBindingPower,
-	expression: {
-		$: 'ArgumentedExpression',
-		creator(parent: Expression, member: Expression): Expression {
-			return {
-				$: 'MemberExpression',
-				parent,
-				member,
-			};
-		},
-	},
-	isRightBinded: false,
-});
-scope.writeElement('.', {
-	$type: 'OperatorGroup',
-	prefix: {
-		bindingPower: maxBindingPower,
-		expression: {
-			type: 'ArgumentedExpression',
-			creator(expression: Expression): Expression {
-				return {
-					$: 'MemberExpression',
-					parent: null,
-					member: expression,
-				};
-			},
-		},
-	},
-	infix: {
-		bindingPower: maxBindingPower,
-		expression: {
-			type: 'ArgumentedExpression',
-			creator(parent: Expression, member: Expression): Expression {
-				return {
-					$: 'MemberExpression',
-					parent,
-					member,
-				};
-			},
-		},
-		isRightBinded: false,
-	},
-	postfix: null,
-});
-
-scope.writeElement('+', {
-	$type: 'OperatorGroup',
-	prefix: {
-		bindingPower: 17,
-		expression: {
-			type: 'ArgumentedExpression',
-			creator(expression: Expression): Expression {
-				return Call(
-					MemberOf(MetaArchetypeOf(expression), Identifier('+')),
-					GroupExpression()
-				);
-			},
-		},
-	},
-	infix: {
-		bindingPower: 17,
-		expression: {
-			type: 'ArgumentedExpression',
-			creator(left: Expression, right: Expression): Expression {
-				return Call(
-					MemberOf(MetaArchetypeOf(left), Identifier('+')),
-					GroupExpression(right)
-				);
-			},
-		},
-		isRightBinded: false,
-	},
-	postfix: null,
-});
-const element = liner.parse(tokens, scope);
+const globalRegister = new MetaRegister();
+loadStdl(globalRegister);
+const element = liner.parse(tokens, globalRegister);
 console.dir(JSON.parse(JSON.stringify(element)), { depth: null });

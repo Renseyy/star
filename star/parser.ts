@@ -1,9 +1,11 @@
 import type { Block } from 'typescript';
 import type { Extrans } from './core/extrans';
 import type { Directive, HashCommands } from './directive';
-import { Token, TokenType } from './token';
+import { colorToken, Token, TokenType } from './token';
 import { Key, CollectionKey, MetaRegister } from './metaRegister';
 import { staticDirectives } from './staticDirectives';
+import type { MemoryExpressions } from './Expression/memory';
+import { getSuggestions, type Suggestion } from './utils';
 
 export const defaultConstructorSymbol = Symbol('defaultConstructor');
 export const defaultIntegerArchetypeSymbol = Symbol('defaultIntegerArchetype');
@@ -50,12 +52,36 @@ export type UnaryOperator = {
 	expression: ArgumentedExpression<[Expression]>;
 };
 
+export function UnaryOperator(
+	bindingPower: bindingPower,
+	expression: ArgumentedExpression<[Expression]>
+): UnaryOperator {
+	return {
+		$: 'UnaryOperator',
+		bindingPower,
+		expression,
+	};
+}
+
 export type InfixOperator = {
 	$: 'InfixOperator';
 	bindingPower: bindingPower;
 	isRightBinded: boolean;
 	expression: ArgumentedExpression<[Expression, Expression]>;
 };
+
+export function InfixOperator(
+	bindingPower: bindingPower,
+	expression: ArgumentedExpression<[Expression, Expression]>,
+	isRightBinded: boolean = false
+): InfixOperator {
+	return {
+		$: 'InfixOperator',
+		bindingPower,
+		expression,
+		isRightBinded,
+	};
+}
 
 export type ExpressionHolder = {
 	$type: 'ExpressionHolder';
@@ -180,18 +206,35 @@ export type BuildExpression = {
 	expressions: Expression[];
 };
 
-export type MemberOf = {
-	$: 'MemberOf';
+export type IndexExpression = {
+	$: 'IndexExpression';
+	context: Expression;
+	expressions: Expression[];
+};
+
+export function IndexExpression(
+	context: Expression,
+	expressions: Expression[]
+): IndexExpression {
+	return {
+		$: 'IndexExpression',
+		context,
+		expressions,
+	};
+}
+
+export type MemberExpression = {
+	$: 'MemberExpression';
 	parent: Expression | null;
 	member: Expression;
 };
 
-export function MemberOf(
+export function MemberExpression(
 	parent: Expression | null,
 	member: Expression
-): MemberOf {
+): MemberExpression {
 	return {
-		$: 'MemberOf',
+		$: 'MemberExpression',
 		parent,
 		member,
 	};
@@ -233,24 +276,22 @@ export function Operator(name: string): Operator {
 	};
 }
 
-export type Expression = (
+export type Expression =
 	| LiteralExpression
 	| BlockExpression
 	| GroupExpression
 	| IdentifierExpression
-	| Directive
 	| TemporaryOperatorExpression
 	| ArgumentedExpression<any>
 	| CallCommandExpression
-	| HashCommands
 	| BuildExpression
-	| Extrans
 	| Call
-	| MemberOf
+	| MemberExpression
 	| TodoExpression
 	| MetaArchetypeOf
 	| Operator
-) & { $: string };
+	| IndexExpression
+	| MemoryExpressions;
 
 export class Decoration {}
 
@@ -266,14 +307,30 @@ export function isGreaterThan(a: bindingPower, b: bindingPower) {
 	return a > b;
 }
 
-export class ExtendedToken extends Token {
+export type ExtendedToken = Token & {
 	skipped: boolean;
+	line: number;
+	column: number;
+};
 
-	public constructor(token: Token, isSkipped: boolean) {
-		super(token.type, token.text, token.index, token.content);
-		this.skipped = isSkipped;
-	}
+export function ExtendedToken(
+	token: Token,
+	isSkipped: boolean,
+	line: number,
+	column: number
+): ExtendedToken {
+	return {
+		...token,
+		skipped: isSkipped,
+		line,
+		column,
+	};
 }
+
+function construct(
+	args: Record<string, Expression>,
+	expression: Expression
+): Expression {}
 
 // Ten parser ma za zadanie zmienić poszczególne elementy na wyrażenia - posiadając już wiedzę o odpowienich operatorach
 export class Parser {
@@ -281,15 +338,99 @@ export class Parser {
 	private index = 0;
 	public decorations: Decoration[] = [];
 
+	private throwTokenError(
+		token: ExtendedToken,
+		message: string,
+		suggestions: Suggestion[] = []
+	) {
+		// Collect tokens from line
+		const tokens = [];
+		// Calculate all tokens before - to end of line or start
+		for (let i = this.index - 1; i >= 0; i--) {
+			const token = this.tokens[i];
+			if (!token) {
+				break;
+			}
+			if (token.type == TokenType.EndOfLine) break;
+			if (
+				token.type == TokenType.IrrelevantToken &&
+				token.content == 'newline'
+			)
+				break;
+			tokens.unshift(token);
+		}
+
+		const location = tokens.reduce(
+			(acc, token) => acc + token.text.length,
+			0
+		);
+		tokens.push(token);
+		for (let i = this.index + 1; i < this.tokens.length; i++) {
+			const token = this.tokens[i];
+			if (!token) break;
+			if (token.type == TokenType.EndOfLine) break;
+			if (
+				token.type == TokenType.IrrelevantToken &&
+				token.content == 'newline'
+			)
+				break;
+			tokens.push(token);
+		}
+		console.error('Parser error:\n');
+		const prefix = `${tokens[0].line} | `;
+		const line = `${prefix}\x1b[37m${tokens
+			.map((t) => colorToken(t))
+			.join('')}\x1b[0m`;
+		console.error(line);
+		const filler =
+			'\x1b[31m┬' + '─'.repeat(token.text.length - 1) + '\x1b[0m';
+		console.error(' '.repeat(location + prefix.length) + filler);
+		const fullMessage = `[ ${message} ]`;
+		const messageLength = fullMessage.length + 1;
+		if (messageLength < location) {
+			const padding = location - messageLength;
+			console.error(
+				'\x1b[31m' +
+					' '.repeat(prefix.length + padding) +
+					fullMessage +
+					'─┘\x1b[0m'
+			);
+		} else {
+			console.error(
+				' '.repeat(location + prefix.length) + '└─' + fullMessage
+			);
+		}
+		console.error();
+		if (suggestions.length > 0) {
+			console.error('\x1b[33mSimilar options:\x1b[0m');
+			for (const suggestion of suggestions) {
+				console.error(` \x1b[37m- ${suggestion.value}\x1b[0m`);
+			}
+			console.error();
+		}
+		process.exit(-1);
+	}
+
 	private loadTokens(tokens: Token[]) {
 		let isSkipped = false;
+		let line = 1;
+		let column = 1;
 		for (const token of tokens) {
 			if (token.type == 'IrrelevantToken') {
+				this.tokens.push(ExtendedToken(token, isSkipped, line, column));
 				isSkipped = true;
+				if (token.content == 'newline') {
+					line++;
+					column = 1;
+				}
 				continue;
 			}
-			this.tokens.push(new ExtendedToken(token, isSkipped));
+			this.tokens.push(ExtendedToken(token, isSkipped, line, column));
 			isSkipped = false;
+			if (token.type == TokenType.EndOfLine) {
+				line++;
+				column = 1;
+			}
 		}
 	}
 
@@ -297,6 +438,10 @@ export class Parser {
 	public getCurrentToken(forTest?: false): ExtendedToken;
 	public getCurrentToken(forTest: boolean = false): ExtendedToken | null {
 		let token = this.tokens[this.index];
+		if (token?.type == TokenType.IrrelevantToken) {
+			this.index++;
+			return this.getCurrentToken(forTest);
+		}
 		if (forTest) {
 			return token ?? null;
 		}
@@ -373,6 +518,19 @@ export class Parser {
 		};
 	}
 
+	private parseIndexBlock(
+		register: MetaRegister,
+		isTransparent: boolean = false
+	): BlockExpression {
+		this.index++;
+		const expressions = this.parseInner(register, TokenType.RightBracket);
+		this.index++;
+		return {
+			$: 'BlockExpression',
+			expressions: expressions,
+		};
+	}
+
 	private parseIdentifier(): Expression {
 		const token = this.getCurrentToken();
 		this.index++;
@@ -421,18 +579,38 @@ export class Parser {
 				callee: defaultConstructor,
 				argumentBlock: this.parseCallBlock(register),
 			};
+		} else if (currentToken.type == TokenType.LeftBracket) {
+			const defaultConstructor = register.readElement(
+				Key('defaultIndexerArchetype')
+			);
+			if (!defaultConstructor) {
+				throw new Error('Cannot get default indexer');
+			}
+			const block = this.parseIndexBlock(register);
+			return IndexExpression(defaultConstructor, block.expressions);
 		} else if (currentToken.type == 'Identifier') {
 			return (
 				this.parseMaybePrefixOperator(register) ??
 				this.parseIdentifier()
 			);
 		} else if (currentToken.type == TokenType.Directive) {
-			const parseFunction = this.parseDirective[currentToken.content];
+			const directive = currentToken.content as string;
+			const parseFunction =
+				this.parseDirective[
+					directive as keyof typeof this.parseDirective
+				];
+
 			if (parseFunction) {
 				this.index++;
 				return parseFunction(register);
 			}
-			throw new Error('Undefined directive ' + currentToken.content);
+			const directives = Object.keys(this.parseDirective);
+			const suggestions = getSuggestions(directive, directives, 3);
+			this.throwTokenError(
+				currentToken,
+				`Undefined directive "${currentToken.content}"`,
+				suggestions
+			);
 		}
 		throw new Error('Unexpected token ' + currentToken.type);
 	}
@@ -463,7 +641,6 @@ export class Parser {
 				};
 				continue;
 			} else if (
-				!token.skipped &&
 				token.type == TokenType.LeftBrace &&
 				isGreaterThan(maxBindingPower, rightBindingPower)
 			) {
@@ -473,6 +650,14 @@ export class Parser {
 					context: left,
 					expressions: right.expressions,
 				};
+				continue;
+			} else if (
+				!token.skipped &&
+				token.type == TokenType.LeftBracket &&
+				isGreaterThan(maxBindingPower, rightBindingPower)
+			) {
+				const right = this.parseIndexBlock(register);
+				left = IndexExpression(left, right.expressions);
 				continue;
 			} else if (
 				!token.skipped &&
@@ -527,7 +712,8 @@ export class Parser {
 			token.type.in(
 				TokenType.Comma,
 				TokenType.LeftBrace,
-				TokenType.LeftParenthesis
+				TokenType.LeftParenthesis,
+				TokenType.LeftBracket
 			)
 		)
 			return true;
@@ -561,7 +747,7 @@ export class Parser {
 			if (token.type.in(TokenType.Semicolon, TokenType.EndOfLine)) {
 				this.index++;
 			} else if (!endType || (endType && token.type != endType)) {
-				throw new Error(`Unexpected token ${token}`);
+				this.throwTokenError(token, `Unexpected token`);
 			}
 		}
 		return expressions;

@@ -1,0 +1,9 @@
+io.print('Hello World!')
+
+some_function_hader := (name, value){}
+
+Collection :: Class(Type <: String, content: Array[Type]) {
+    #indexer :: (index: UInt) {
+        content[index]   
+    }
+}

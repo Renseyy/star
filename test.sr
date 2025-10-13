@@ -1,4 +1,1 @@
-#define + #InfixOperator{
-    #= binding_power #MAX_BINDING_POWER
-    #= is_right_binded #TRUE
-}
+some_array: Array(Int, 1, 2, 3)
