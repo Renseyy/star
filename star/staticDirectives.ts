@@ -5,7 +5,7 @@ import {
 	maxBindingPower,
 	type InfixOperator,
 	type Parser,
-} from './parser';
+} from './parser/parser';
 import { expect } from './utils';
 
 export function staticDirectives(parser: Parser) {

@@ -1,4 +1,4 @@
-import type { BlockExpression } from '../../parser';
+import type { BlockExpression } from '../../parser/parser';
 
 class ScopedMemory {
 	memory: Map<string, any> = new Map();

@@ -1,4 +1,8 @@
-// Modern SUFE replacement
+Array :: Archetype{
+    #to String :: fn (index: Int) {
+        
+    }
+}
 
-a := 10
-b: 10
+a
+|> b

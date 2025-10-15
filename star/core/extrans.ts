@@ -1,4 +1,4 @@
-import type { Identifier } from '../parser';
+import type { Identifier } from '../parser/parser';
 
 // Used to represent scoped memory. With this, we can ommit scopes in next level
 export type MemoryExtran = {

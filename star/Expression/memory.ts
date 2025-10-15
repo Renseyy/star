@@ -1,4 +1,4 @@
-import type { Expression } from '../parser';
+import type { Expression } from '../parser/parser';
 
 // Expressions for memory and type system
 

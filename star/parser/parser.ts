@@ -1,11 +1,12 @@
 import type { Block } from 'typescript';
-import type { Extrans } from './core/extrans';
-import type { Directive, HashCommands } from './directive';
-import { colorToken, Token, TokenType } from './tokenizer/token';
-import { Key, CollectionKey, MetaRegister } from './metaRegister';
-import { staticDirectives } from './staticDirectives';
-import type { MemoryExpressions } from './Expression/memory';
-import { getSuggestions, type Suggestion } from './utils';
+import type { Extrans } from '../core/extrans';
+import type { Directive, HashCommands } from '../directive';
+import { Token, TokenType } from '../tokenizer/token';
+import { Key, CollectionKey, MetaRegister } from '../metaRegister';
+import { staticDirectives } from '../staticDirectives';
+import type { MemoryExpressions } from '../Expression/memory';
+import { colorToken, getSuggestions, type Suggestion } from '../utils';
+import { ExtendedToken } from './extendedToken';
 
 export const defaultConstructorSymbol = Symbol('defaultConstructor');
 export const defaultIntegerArchetypeSymbol = Symbol('defaultIntegerArchetype');
@@ -307,31 +308,6 @@ export function isGreaterThan(a: bindingPower, b: bindingPower) {
 	return a > b;
 }
 
-export type ExtendedToken = Token & {
-	skipped: boolean;
-	line: number;
-	column: number;
-};
-
-export function ExtendedToken(
-	token: Token,
-	isSkipped: boolean,
-	line: number,
-	column: number
-): ExtendedToken {
-	return {
-		...token,
-		skipped: isSkipped,
-		line,
-		column,
-	};
-}
-
-function construct(
-	args: Record<string, Expression>,
-	expression: Expression
-): Expression {}
-
 // Ten parser ma za zadanie zmienić poszczególne elementy na wyrażenia - posiadając już wiedzę o odpowienich operatorach
 export class Parser {
 	private tokens: ExtendedToken[] = [];
@@ -377,7 +353,7 @@ export class Parser {
 			tokens.push(token);
 		}
 		console.error('Parser error:\n');
-		const prefix = `${tokens[0].line} | `;
+		const prefix = `${token.line} | `;
 		const line = `${prefix}\x1b[37m${tokens
 			.map((t) => colorToken(t))
 			.join('')}\x1b[0m`;
@@ -440,7 +416,7 @@ export class Parser {
 		let token = this.tokens[this.index];
 		if (token?.type == TokenType.IrrelevantToken) {
 			this.index++;
-			return this.getCurrentToken(forTest);
+			return this.getCurrentToken(forTest as any);
 		}
 		if (forTest) {
 			return token ?? null;
@@ -612,7 +588,10 @@ export class Parser {
 				suggestions
 			);
 		}
-		throw new Error('Unexpected token ' + currentToken.type);
+		this.throwTokenError(
+			currentToken,
+			`Undefined token "${currentToken.type}"`
+		);
 	}
 	/**
 	 * @mutates elements
@@ -754,10 +733,10 @@ export class Parser {
 	}
 
 	public parse(
-		tokens: Token[],
+		extendedToken: ExtendedToken[],
 		register: MetaRegister = new MetaRegister()
 	): BlockExpression {
-		this.loadTokens(tokens);
+		this.tokens = extendedToken;
 		this.index = 0;
 		return {
 			$: 'BlockExpression',

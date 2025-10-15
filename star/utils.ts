@@ -1,3 +1,6 @@
+import type { ExtendedToken } from './parser/extendedToken';
+import { TokenType } from './tokenizer/token';
+
 export interface StringRecord<T> {
 	[key: string]: T;
 }
@@ -86,4 +89,28 @@ export function getSuggestions(
 
 	// Sort suggestions by distance (smallest distance first)
 	return suggestions.sort((a, b) => a.distance - b.distance);
+}
+
+export function colorToken(token: ExtendedToken): string {
+	if (token.type.in(TokenType.LeftBrace, TokenType.RightBrace))
+		return `\x1b[38;5;215m${token.text}\x1b[0m`;
+	else if (
+		token.type.in(TokenType.LeftParenthesis, TokenType.RightParenthesis)
+	)
+		return `\x1b[38;5;27m${token.text}\x1b[0m`;
+	else if (token.type.in(TokenType.LeftBracket, TokenType.RightBracket))
+		return `\x1b[38;5;215m${token.text}\x1b[0m`;
+	else if (token.isOperator()) return `\x1b[38;5;77m${token.text}\x1b[0m`;
+	else if (token.isCommand()) return `\x1b[35m${token.text}\x1b[0m`;
+	else if (token.type == TokenType.Directive)
+		return `\x1b[36m${token.text}\x1b[0m`;
+	return token.text;
+}
+
+export function renderCodeBlock(tokens: ExtendedToken[]) {
+	let code = '';
+	for (const token of tokens) {
+		code += colorToken(token);
+	}
+	return code;
 }

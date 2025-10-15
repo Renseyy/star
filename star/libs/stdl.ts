@@ -12,15 +12,11 @@ import {
 	MemberExpression,
 	TodoExpression,
 	type Expression,
-} from '../parser';
+} from '../parser/parser';
 
 export function loadStdl(scope: MetaRegister) {
 	// Dodać definicję Funkcji
 	scope.writeElement(CollectionKey('type', 'I32'), HashType('I32', 1));
-	scope.writeElement(
-		CollectionKey('type', 'Int'),
-		scope.alias(CollectionKey('type', 'I32'))
-	);
 
 	scope.writeElement(Key('defaultConstructorArchetype'), {
 		$: 'IdentifierExpression',

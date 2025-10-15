@@ -1,3 +1,5 @@
+import type { ExtendedToken } from '../parser/extendedToken';
+
 export const TokenType = {
 	InvalidToken: 'InvalidToken',
 	IrrelevantToken: 'IrrelevantToken',
@@ -60,18 +62,4 @@ export function Token(
 		operatorSet,
 		toString: () => `[ ${type} '${text.replace('\n', '⏎')}' @${index})]`,
 	};
-}
-
-export function colorToken(token: Token): string {
-	if (token.type.in(TokenType.LeftBrace, TokenType.RightBrace))
-		return `\x1b[38;5;215m${token.text}\x1b[0m`;
-	else if (
-		token.type.in(TokenType.LeftParenthesis, TokenType.RightParenthesis)
-	)
-		return `\x1b[38;5;27m${token.text}\x1b[0m`;
-	else if (token.type.in(TokenType.LeftBracket, TokenType.RightBracket))
-		return `\x1b[38;5;215m${token.text}\x1b[0m`;
-	else if (token.type.in(TokenType.Identifier) && token?.operatorSet)
-		return `\x1b[38;5;77m${token.text}\x1b[0m`;
-	return token.text;
 }

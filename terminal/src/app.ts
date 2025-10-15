@@ -1,6 +1,6 @@
 import type { Token } from '../../star/tokenizer/token';
 import { Tokenizer } from '../../star/tokenizer';
-import { Parser } from '../../star/parser';
+import { Parser } from '../../star/parser/parser';
 import './style/main.css';
 import 'victormono';
 

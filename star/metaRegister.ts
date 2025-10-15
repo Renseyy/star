@@ -16,7 +16,7 @@ import {
 	type InfixOperator,
 	type MetaScopeRegistrySymbolsType,
 	type UnaryOperator,
-} from './parser';
+} from './parser/parser';
 
 type MetaRegisterGroups =
 	| 'defaultInteger'

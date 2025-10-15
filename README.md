@@ -4,19 +4,33 @@
 
 > zamieniamy wszystko na tokeny, oraz oznaczamy tokeny nieznaczące
 
-### 2) Parsowanie [~]
+### 2) Scoper [~]
+> kaskadowo rozwiązujemy operatory oraz komendy. Nadajemy numery lini, oraz oznaczamy elementy niepotrzebne
+> Zwracamy ExtendedToken 
 
-> tworzymy abstrakcyjne drzewo składni - rozwiązujemy operatory oraz komendy. Dodajemy o tym informację do tokenów
+### 3) Parsowanie [~]
 
-### 3) Zrozumienie [ ]
+> tworzymy abstrakcyjne drzewo składni - rozwiązujemy operatory oraz komendy. Dodajemy o tym informację do tokenów. Sprawdzamy struktury bazowe
 
+### 4) Type checker [ ]
 > sprawdzamy typy, rozwiązyjemy niejednoznaczności - sprawdzamy, czy program ma sens, optymalizujemy
 
-### 4) Kompilacja [ ]
+### 5) Linowanie [ ]
+
+### 6) Kompilacja [ ]
 
 > Zmieniamy program na odpowiedni język docelowy
 
-### 5) Uruchomienie
+### 7) Uruchomienie
+
+# Sprawdzanie typów na etapie parsowania
+Ze względu na konstrukcję języka w tym obecność komend. Wymagane jest sprawdzanie języka na etapie parsowania. Realizowane jest to przez pamięć cache.
+
+## Struktury bazowe
+Na etapie parsowania sprawdzamy tak zwane struktury bazowe - decydujemy, czy dany identyfikator to:
+ - operator
+ - komenda
+ - inny identyfikator
 
 # MetaScope
 
