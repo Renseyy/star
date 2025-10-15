@@ -4,7 +4,11 @@
  * Rejestr jest także przydatny przy `wyrażeniach uargumentowanych`, gdzie służy do przekazywania parametrów
  */
 
-import type { ArchetypeElement, MemoryElement } from './metaRegisterElement';
+import type {
+	ArchetypeElement,
+	MemoryElement,
+	Type,
+} from './metaRegisterElement';
 import {
 	defaultConstructorSymbol,
 	type Archetype,
@@ -44,9 +48,9 @@ export type MetaRegisterShape = {
 	prefixOperator: Collection<UnaryOperator>;
 	postfixOperator: Collection<UnaryOperator>;
 	infixOperator: Collection<InfixOperator>;
-	archetype: Collection<Archetype>;
+	type: Collection<Type>;
+	method: Collection<ArchetypeElement>;
 	variable: Collection<MemoryElement>;
-	shape: Collection<Expression>;
 };
 
 type ValueOf<T> = T[keyof T];

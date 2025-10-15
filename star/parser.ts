@@ -1,7 +1,7 @@
 import type { Block } from 'typescript';
 import type { Extrans } from './core/extrans';
 import type { Directive, HashCommands } from './directive';
-import { colorToken, Token, TokenType } from './token';
+import { colorToken, Token, TokenType } from './tokenizer/token';
 import { Key, CollectionKey, MetaRegister } from './metaRegister';
 import { staticDirectives } from './staticDirectives';
 import type { MemoryExpressions } from './Expression/memory';

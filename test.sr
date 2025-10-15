@@ -1,1 +1,4 @@
-some_array: Array(Int, 1, 2, 3)
+// Modern SUFE replacement
+
+a := 10
+b: 10

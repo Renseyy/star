@@ -17,10 +17,29 @@ export type HashType = {
 		| 'U16'
 		| 'U32'
 		| 'U64'
-		| 'Ptr'
 		| 'F32'
 		| 'F64';
+
 	count: number | null;
+	isReference: boolean;
+};
+
+export function HashType(
+	name: HashType['name'],
+	count: number | null = 1,
+	isReference: boolean = false
+): HashType {
+	return {
+		$: 'HashType',
+		name,
+		count,
+		isReference,
+	};
+}
+
+export type Reference = {
+	$: 'Reference';
+	path: string[];
 };
 
 export type Type = HashType | ArchetypeElement;

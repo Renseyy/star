@@ -1,4 +1,4 @@
-import type { Token } from '../../star/token';
+import type { Token } from '../../star/tokenizer/token';
 import { Tokenizer } from '../../star/tokenizer';
 import { Parser } from '../../star/parser';
 import './style/main.css';
