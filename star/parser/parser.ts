@@ -414,7 +414,7 @@ export class Parser {
 	public getCurrentToken(forTest?: false): ExtendedToken;
 	public getCurrentToken(forTest: boolean = false): ExtendedToken | null {
 		let token = this.tokens[this.index];
-		if (token?.type == TokenType.IrrelevantToken) {
+		if (token?.isIrrelevant()) {
 			this.index++;
 			return this.getCurrentToken(forTest as any);
 		}

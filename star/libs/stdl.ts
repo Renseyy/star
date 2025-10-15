@@ -94,4 +94,15 @@ export function loadStdl(scope: MetaRegister) {
 		},
 		isRightBinded: false,
 	});
+	scope.writeElement(CollectionKey('infixOperator', '+'), {
+		$: 'InfixOperator',
+		bindingPower: 2,
+		expression: {
+			$: 'ArgumentedExpression',
+			creator(parent: Expression, member: Expression): Expression {
+				return ExtendsExpression(parent, member);
+			},
+		},
+		isRightBinded: false,
+	});
 }

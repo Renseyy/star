@@ -30,14 +30,9 @@ const scope: Scope = {
 	':': operator(false, true),
 	':=': operator(false, true),
 	'=': operator(false, true),
+	'+': operator(true, false),
 };
 const extendedTokens = scoper.resolveScopes(tokens, scope);
-console.table(
-	extendedTokens.map((token) => ({
-		...token,
-		text: token.text.replace(/[\r\n]/g, ''),
-	}))
-);
 console.log(renderCodeBlock(extendedTokens));
 const globalRegister = new MetaRegister();
 loadStdl(globalRegister);

@@ -1,8 +1,2 @@
-Array :: Archetype{
-    #to String :: fn (index: Int) {
-        
-    }
-}
-
-a
-|> b
+a 
+    + b
