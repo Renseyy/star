@@ -1,5 +1,11 @@
+some_value: String = "test"
 
+some_value = "other_string"
 
+some_value: "const_value"
 
+some_value = "test" // error
 
-a
+App(
+    name: 
+)

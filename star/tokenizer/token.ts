@@ -1,9 +1,10 @@
-import type { ExtendedToken } from '../parser/extendedToken';
+import type { ExtendedToken } from '../scoper/extendedToken';
 
 export const TokenType = {
 	InvalidToken: 'InvalidToken',
 
 	Space: 'Space',
+	LineSeparator: 'LineSeparator',
 	Identifier: 'Identifier',
 	String: 'String',
 	Number: 'Number',
@@ -28,6 +29,8 @@ export const TokenType = {
 
 	Comma: 'Comma',
 	Semicolon: 'Semicolon',
+
+	SingleLineComment: 'SingleLineComment',
 } as const;
 
 export const FLAGS = {
@@ -45,21 +48,19 @@ export type BaseToken = {
 	type: TokenType;
 	text: string;
 	index: number;
-	content?: string;
+	content?: string | number;
 	flags: number;
 
 	toString(): string;
 };
 
-export type Token =
-	| BaseToken
-	| (BaseToken & { type: 'IrreleavantToken'; content: 'space' | 'newline' });
+export type Token = BaseToken;
 
 export function Token(
 	type: TokenType,
 	text: string,
 	index: number,
-	content?: string,
+	content?: string | number,
 	flags: number = 0
 ): Token {
 	const self = {

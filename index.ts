@@ -37,10 +37,21 @@ console.table(
 	extendedTokens.map((token) => ({
 		...token,
 		text: token.text.replace(/[\r\n]/g, ''),
+		isIrrelevant: token.isIrrelevant(),
+		containsNewLine: token.containsNewLine(),
 	})),
-	['type', 'text', 'index', 'line', 'column', 'flags', 'containsNewLine']
+	[
+		'type',
+		'text',
+		'index',
+		'line',
+		'column',
+		'flags',
+		'isIrrelevant',
+		'containsNewLine',
+	]
 );
-console.log(renderCodeBlock(extendedTokens));
+console.log(renderCodeBlock(extendedTokens, true));
 const globalRegister = new MetaRegister();
 loadStdl(globalRegister);
 const element = liner.parse(extendedTokens, globalRegister);

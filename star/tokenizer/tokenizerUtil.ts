@@ -28,7 +28,11 @@ export function isValidAlphaNumericIdentifier(
 }
 
 export function isSpace(character: string) {
-	return [' ', '\t', '\n', '\r', '\f', '\v'].includes(character);
+	return [' ', '\t', '\f', '\v'].includes(character);
+}
+
+export function isLineSeparator(character: string) {
+	return character == '\r' || character == '\n';
 }
 
 export function isDigit(character: string) {

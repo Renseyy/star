@@ -2,6 +2,7 @@ import { TokenType, Token, FLAGS } from './token';
 import './ArrayUtil';
 import {
 	isDigit,
+	isLineSeparator,
 	isNewline,
 	isSpace,
 	isValidAlphaNumericIdentifier,
@@ -112,6 +113,30 @@ export class Tokenizer {
 		while (this.hasChars()) {
 			const start = this.index;
 			let currentChar = this.getChar();
+			if (currentChar == '/') {
+				if (this.nextChar(1) == '/') {
+					let text = '/';
+					this.next();
+					while (this.hasChars()) {
+						currentChar = this.getChar();
+						if (currentChar == '\n') {
+							break;
+						}
+						text += currentChar;
+						this.next();
+					}
+					this.pushToken(
+						Token(
+							TokenType.SingleLineComment,
+							text,
+							start,
+							void 0,
+							FLAGS.IS_IRRELEVANT
+						)
+					);
+					continue;
+				}
+			}
 			if (currentChar == ',') {
 				this.pushToken(Token(TokenType.Comma, currentChar, start));
 			} else if (currentChar == '(') {
@@ -145,17 +170,17 @@ export class Tokenizer {
 				this.tokens.push(
 					Token(TokenType.RightBracket, currentChar, start)
 				);
-			} else if (currentChar == "'") {
-				let content = "'";
+			} else if (currentChar == '"') {
+				let content = '"';
 				let finished = false;
 				while (true) {
 					if (!this.next()) {
 						break;
 					}
 					currentChar = this.getChar();
-					if (currentChar == "'") {
+					if (currentChar == '"') {
 						finished = true;
-						content += "'";
+						content += '"';
 						this.next();
 						break;
 					}
@@ -188,20 +213,44 @@ export class Tokenizer {
 				);
 				continue;
 			} else {
+				// Dodać zapisywanie ilości wciącia - przydatne dla
 				if (isSpace(currentChar)) {
 					let text = '';
-					let flag = 0;
 					do {
-						if (currentChar == '\n') {
-							flag |= FLAGS.CONTAINS_NEW_LINE;
-						}
 						text += currentChar;
 						if (!this.next()) break;
 						currentChar = this.getChar();
 					} while (isSpace(currentChar));
 					this.tokens.push(
-						Token(TokenType.Space, text, start, void 0, flag)
+						Token(
+							TokenType.Space,
+							text,
+							start,
+							void 0,
+							FLAGS.IS_IRRELEVANT
+						)
 					);
+					continue;
+				} else if (isLineSeparator(currentChar)) {
+					const tokens: Token[] = [];
+					do {
+						tokens.push(
+							Token(
+								TokenType.LineSeparator,
+								currentChar,
+								start,
+								void 0,
+								FLAGS.IS_IRRELEVANT
+							)
+						);
+						if (!this.next()) break;
+						currentChar = this.getChar();
+					} while (isLineSeparator(currentChar));
+					const last = tokens[tokens.length - 1] as Token;
+					last.flags &= ~FLAGS.IS_IRRELEVANT;
+					tokens[tokens.length - 1] = last;
+					console.log(tokens);
+					this.tokens.push(...tokens);
 					continue;
 				} else if (isDigit(currentChar)) {
 					let number = currentChar;

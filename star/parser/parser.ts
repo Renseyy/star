@@ -5,8 +5,13 @@ import { Token, TokenType } from '../tokenizer/token';
 import { Key, CollectionKey, MetaRegister } from '../metaRegister';
 import { staticDirectives } from '../staticDirectives';
 import type { MemoryExpressions } from '../Expression/memory';
-import { colorToken, getSuggestions, type Suggestion } from '../utils';
-import { ExtendedToken } from './extendedToken';
+import {
+	colorToken,
+	getSuggestions,
+	renderCodeBlock,
+	type Suggestion,
+} from '../utils';
+import { ExtendedToken } from '../scoper/extendedToken';
 
 export const defaultConstructorSymbol = Symbol('defaultConstructor');
 export const defaultIntegerArchetypeSymbol = Symbol('defaultIntegerArchetype');
@@ -319,95 +324,24 @@ export class Parser {
 		message: string,
 		suggestions: Suggestion[] = []
 	) {
-		// Collect tokens from line
-		const tokens = [];
-		// Calculate all tokens before - to end of line or start
-		for (let i = this.index - 1; i >= 0; i--) {
-			const token = this.tokens[i];
-			if (!token) {
-				break;
-			}
-			if (token.type == TokenType.EndOfLine) break;
-			if (
-				token.type == TokenType.IrrelevantToken &&
-				token.content == 'newline'
+		console.log(
+			renderCodeBlock(
+				this.tokens,
+				false,
+				token.line - 2,
+				token.line + 1,
+				[
+					{
+						content: message,
+						line: token.line,
+						column: token.column,
+						length: token.text.length,
+					},
+				],
+				'\x1b[31mParser error'
 			)
-				break;
-			tokens.unshift(token);
-		}
-
-		const location = tokens.reduce(
-			(acc, token) => acc + token.text.length,
-			0
 		);
-		tokens.push(token);
-		for (let i = this.index + 1; i < this.tokens.length; i++) {
-			const token = this.tokens[i];
-			if (!token) break;
-			if (token.type == TokenType.EndOfLine) break;
-			if (
-				token.type == TokenType.IrrelevantToken &&
-				token.content == 'newline'
-			)
-				break;
-			tokens.push(token);
-		}
-		console.error('Parser error:\n');
-		const prefix = `${token.line} | `;
-		const line = `${prefix}\x1b[37m${tokens
-			.map((t) => colorToken(t))
-			.join('')}\x1b[0m`;
-		console.error(line);
-		const filler =
-			'\x1b[31m┬' + '─'.repeat(token.text.length - 1) + '\x1b[0m';
-		console.error(' '.repeat(location + prefix.length) + filler);
-		const fullMessage = `[ ${message} ]`;
-		const messageLength = fullMessage.length + 1;
-		if (messageLength < location) {
-			const padding = location - messageLength;
-			console.error(
-				'\x1b[31m' +
-					' '.repeat(prefix.length + padding) +
-					fullMessage +
-					'─┘\x1b[0m'
-			);
-		} else {
-			console.error(
-				' '.repeat(location + prefix.length) + '└─' + fullMessage
-			);
-		}
-		console.error();
-		if (suggestions.length > 0) {
-			console.error('\x1b[33mSimilar options:\x1b[0m');
-			for (const suggestion of suggestions) {
-				console.error(` \x1b[37m- ${suggestion.value}\x1b[0m`);
-			}
-			console.error();
-		}
 		process.exit(-1);
-	}
-
-	private loadTokens(tokens: Token[]) {
-		let isSkipped = false;
-		let line = 1;
-		let column = 1;
-		for (const token of tokens) {
-			if (token.type == 'IrrelevantToken') {
-				this.tokens.push(ExtendedToken(token, isSkipped, line, column));
-				isSkipped = true;
-				if (token.content == 'newline') {
-					line++;
-					column = 1;
-				}
-				continue;
-			}
-			this.tokens.push(ExtendedToken(token, isSkipped, line, column));
-			isSkipped = false;
-			if (token.type == TokenType.EndOfLine) {
-				line++;
-				column = 1;
-			}
-		}
 	}
 
 	public getCurrentToken(forTest: true): ExtendedToken | null;
@@ -590,7 +524,7 @@ export class Parser {
 		}
 		this.throwTokenError(
 			currentToken,
-			`Undefined token "${currentToken.type}"`
+			`Unexpected token "${currentToken.type}"`
 		);
 	}
 	/**
@@ -723,7 +657,7 @@ export class Parser {
 				if (!this.hasToken()) break;
 			}
 			token = this.getCurrentToken();
-			if (token.type.in(TokenType.Semicolon, TokenType.EndOfLine)) {
+			if (token.type.in(TokenType.Semicolon, TokenType.LineSeparator)) {
 				this.index++;
 			} else if (!endType || (endType && token.type != endType)) {
 				this.throwTokenError(token, `Unexpected token`);

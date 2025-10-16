@@ -1,14 +1,14 @@
-import type { Token } from '../tokenizer/token';
+import { FLAGS, type Token } from '../tokenizer/token';
 
 export type ExtendedToken = Token & {
 	skipped: boolean;
 	line: number;
 	column: number;
-	tags: string[];
 
 	isIrrelevant(): boolean;
 	isOperator(): boolean;
 	isCommand(): boolean;
+	containsNewLine(): boolean;
 };
 
 export function ExtendedToken(
@@ -22,11 +22,11 @@ export function ExtendedToken(
 		skipped: isSkipped,
 		line,
 		column,
-		tags: [],
 
-		isIrrelevant: () => self.tags.includes('irrelevant'),
-		isOperator: () => self.tags.includes('operator'),
-		isCommand: () => self.tags.includes('command'),
+		isIrrelevant: () => !!(self.flags & FLAGS.IS_IRRELEVANT),
+		isOperator: () => !!(self.flags & FLAGS.IS_OPERATOR),
+		isCommand: () => !!(self.flags & FLAGS.IS_COMMAND),
+		containsNewLine: () => !!(self.flags & FLAGS.CONTAINS_NEW_LINE),
 	} as ExtendedToken;
 	return self;
 }

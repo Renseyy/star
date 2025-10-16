@@ -1,5 +1,5 @@
 import { MetaRegister } from '../metaRegister';
-import { ExtendedToken } from '../parser/extendedToken';
+import { ExtendedToken } from './extendedToken';
 import { FLAGS, TokenType, type Token } from '../tokenizer/token';
 import { ScopeStack, type Scope } from './scope';
 
@@ -22,28 +22,70 @@ export class Scoper {
 		let line = 1;
 		let column = 1;
 		let isSkipped = false;
-		let nextLineIsIrrelevant = false;
+		let nextIsIrrelevant = false;
 		const resultTokens: ExtendedToken[] = [];
+		const getLastIgnoringSpaces = () => {
+			for (let i = resultTokens.length - 1; i >= 0; i--) {
+				const token = resultTokens[i] as ExtendedToken;
+				if (token.type == TokenType.Space) {
+					continue;
+				}
+				return token;
+			}
+			return null;
+		};
 		for (let i = 0; i < tokens.length; i++) {
 			const token = tokens[i] as Token;
+			// Irrelevant tokens
+			if (i == 0 || i == tokens.length - 1) {
+				nextIsIrrelevant = true;
+			}
+			if (
+				token.type.in(
+					TokenType.RightBrace,
+					TokenType.RightBracket,
+					TokenType.RightParenthesis,
+					TokenType.Semicolon,
+					TokenType.Comma
+				)
+			) {
+				const last = getLastIgnoringSpaces();
+				if (last) {
+					last.flags |= FLAGS.IS_IRRELEVANT;
+				}
+			}
 			if (token.type == 'LeftBrace') {
 				scopeStack.push({});
 			} else if (token.type == 'RightBrace') {
 				scopeStack.pop();
 			} else if (token.type == TokenType.Space) {
-				const next = tokens[i + 1];
-				const isIrrelevant = i == 0 || i == tokens.length - 1;
-				if (isIrrelevant) {
-					token.flags |= FLAGS.IS_IRRELEVANT;
-				}
-				resultTokens.push(
-					ExtendedToken(token, isSkipped, line, column)
+				const resultToken = ExtendedToken(
+					token,
+					isSkipped,
+					line,
+					column
 				);
+
 				isSkipped = true;
-				if (token) {
-					line++;
-					column = 1;
+				resultTokens.push(resultToken);
+				column += token.text.length;
+				continue;
+			} else if (token.type == TokenType.LineSeparator) {
+				const resultToken = ExtendedToken(
+					token,
+					isSkipped,
+					line,
+					column
+				);
+				if (nextIsIrrelevant) {
+					resultToken.flags |= FLAGS.IS_IRRELEVANT;
 				}
+
+				isSkipped = false;
+				nextIsIrrelevant = false;
+				line++;
+				column = 1;
+				resultTokens.push(resultToken);
 				continue;
 			} else if (token.type == 'Identifier') {
 				const element = scopeStack.get(token.text);
@@ -54,27 +96,37 @@ export class Scoper {
 						line,
 						column
 					);
+					column += token.text.length;
 					if (element == 'command') {
 						extendedToken.flags |= FLAGS.IS_COMMAND;
 					} else {
 						if (element.ignoresLineAfter) {
-							nextLineIsIrrelevant = true;
+							nextIsIrrelevant = true;
 						}
 						if (element.ignoresLineBefore) {
-							const last = resultTokens[resultTokens.length - 1];
+							const last = getLastIgnoringSpaces();
 							if (!last) continue;
 							if (last.type == TokenType.Space)
-								last.tags.push('irrelevant');
+								last.flags |= FLAGS.IS_IRRELEVANT;
 						}
 						extendedToken.flags |= FLAGS.IS_OPERATOR;
 					}
+					nextIsIrrelevant = false;
 					isSkipped = false;
 					resultTokens.push(extendedToken);
 					continue;
 				}
 			}
-			nextLineIsIrrelevant = false;
+			nextIsIrrelevant = token.type.in(
+				TokenType.LeftBrace,
+				TokenType.LeftBracket,
+				TokenType.LeftParenthesis,
+				TokenType.Semicolon,
+				TokenType.Comma
+			);
+
 			resultTokens.push(ExtendedToken(token, isSkipped, line, column));
+			column += token.text.length;
 			isSkipped = false;
 		}
 		return resultTokens;
