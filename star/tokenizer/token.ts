@@ -30,6 +30,15 @@ export const TokenType = {
 	Semicolon: 'Semicolon',
 } as const;
 
+export const FLAGS = {
+	CONTAINS_NEW_LINE: 0b1,
+	IS_IRRELEVANT: 0b10,
+	IS_COMMAND: 0b100,
+	IS_OPERATOR: 0b1_000,
+	OPERATOR_SET: 0b10_000,
+	AFTER_SPACE: 0b100_000,
+} as const;
+
 export type TokenType = keyof typeof TokenType;
 
 export type BaseToken = {
@@ -37,7 +46,7 @@ export type BaseToken = {
 	text: string;
 	index: number;
 	content?: string;
-	operatorSet?: true;
+	flags: number;
 
 	toString(): string;
 };
@@ -51,14 +60,16 @@ export function Token(
 	text: string,
 	index: number,
 	content?: string,
-	operatorSet?: true
-) {
-	return {
+	flags: number = 0
+): Token {
+	const self = {
 		type,
 		text,
 		index,
 		content,
-		operatorSet,
+		flags,
 		toString: () => `[ ${type} '${text.replace('\n', '⏎')}' @${index})]`,
 	};
+
+	return self;
 }

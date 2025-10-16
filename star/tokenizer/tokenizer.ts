@@ -1,4 +1,4 @@
-import { TokenType, Token } from './token';
+import { TokenType, Token, FLAGS } from './token';
 import './ArrayUtil';
 import {
 	isDigit,
@@ -190,12 +190,18 @@ export class Tokenizer {
 			} else {
 				if (isSpace(currentChar)) {
 					let text = '';
+					let flag = 0;
 					do {
+						if (currentChar == '\n') {
+							flag |= FLAGS.CONTAINS_NEW_LINE;
+						}
 						text += currentChar;
 						if (!this.next()) break;
 						currentChar = this.getChar();
 					} while (isSpace(currentChar));
-					this.tokens.push(Token(TokenType.Space, text, start));
+					this.tokens.push(
+						Token(TokenType.Space, text, start, void 0, flag)
+					);
 					continue;
 				} else if (isDigit(currentChar)) {
 					let number = currentChar;
@@ -218,8 +224,13 @@ export class Tokenizer {
 						}
 						break;
 					}
-					const token = Token(TokenType.Identifier, text, start);
-					token.operatorSet = true;
+					const token = Token(
+						TokenType.Identifier,
+						text,
+						start,
+						void 0,
+						FLAGS.OPERATOR_SET
+					);
 					this.tokens.push(token);
 					continue;
 				} else if (isValidAlphaNumericIdentifier(currentChar, false)) {

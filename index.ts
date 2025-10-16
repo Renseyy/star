@@ -37,7 +37,8 @@ console.table(
 	extendedTokens.map((token) => ({
 		...token,
 		text: token.text.replace(/[\r\n]/g, ''),
-	}))
+	})),
+	['type', 'text', 'index', 'line', 'column', 'flags', 'containsNewLine']
 );
 console.log(renderCodeBlock(extendedTokens));
 const globalRegister = new MetaRegister();
