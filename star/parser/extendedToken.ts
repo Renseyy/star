@@ -24,12 +24,9 @@ export function ExtendedToken(
 		column,
 		tags: [],
 
-		isIrrelevant: () =>
-			token.type == 'IrrelevantToken' || self.tags.includes('irrelevant'),
-		isOperator: () =>
-			token.type == 'Identifier' && self.tags.includes('operator'),
-		isCommand: () =>
-			token.type == 'Identifier' && self.tags.includes('command'),
+		isIrrelevant: () => self.tags.includes('irrelevant'),
+		isOperator: () => self.tags.includes('operator'),
+		isCommand: () => self.tags.includes('command'),
 	} as ExtendedToken;
 	return self;
 }

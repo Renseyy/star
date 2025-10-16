@@ -24,12 +24,13 @@ export class Scoper {
 		let isSkipped = false;
 		let nextLineIsIrrelevant = false;
 		const resultTokens: ExtendedToken[] = [];
-		for (const token of tokens) {
+		for (let i = 0; i < tokens.length; i++) {
+			const token = tokens[i] as Token;
 			if (token.type == 'LeftBrace') {
 				scopeStack.push({});
 			} else if (token.type == 'RightBrace') {
 				scopeStack.pop();
-			} else if (token.type == 'IrrelevantToken') {
+			} else if (token.type == TokenType.Space) {
 				resultTokens.push(
 					ExtendedToken(token, isSkipped, line, column)
 				);

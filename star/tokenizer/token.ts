@@ -2,9 +2,8 @@ import type { ExtendedToken } from '../parser/extendedToken';
 
 export const TokenType = {
 	InvalidToken: 'InvalidToken',
-	IrrelevantToken: 'IrrelevantToken',
 
-	EndOfLine: 'EndOfLine',
+	Space: 'Space',
 	Identifier: 'Identifier',
 	String: 'String',
 	Number: 'Number',

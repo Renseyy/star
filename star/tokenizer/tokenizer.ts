@@ -35,15 +35,6 @@ export class Tokenizer {
 		this.options = { ...this.options, ...options };
 	}
 
-	private lastRelevantToken(): Token | undefined {
-		for (let i = this.tokens.length - 1; i >= 0; i--) {
-			if (this.tokens[i]?.type != TokenType.IrrelevantToken) {
-				return this.tokens[i];
-			}
-		}
-		return undefined;
-	}
-
 	private getChar(): string {
 		return this.input[this.index] || '\0';
 	}
@@ -78,16 +69,6 @@ export class Tokenizer {
 			message,
 			index: this.index.toString(),
 		});
-	}
-
-	private trimBefore(): boolean {
-		if (this.tokens.length <= 0) return false;
-		const last = this.tokens.last();
-		if (last && last.type === TokenType.EndOfLine) {
-			last.type = TokenType.IrrelevantToken;
-			return true;
-		}
-		return false;
 	}
 
 	private pushToken(token: Token, pushToBracketStack: boolean = false) {
@@ -139,7 +120,6 @@ export class Tokenizer {
 					true
 				);
 			} else if (currentChar == ')') {
-				this.trimBefore();
 				this.expect(
 					TokenType.LeftParenthesis,
 					TokenType.RightParenthesis
@@ -153,7 +133,6 @@ export class Tokenizer {
 					true
 				);
 			} else if (currentChar == '}') {
-				this.trimBefore();
 				this.expect(TokenType.LeftBrace, TokenType.RightBrace);
 				this.pushToken(Token(TokenType.RightBrace, currentChar, start));
 			} else if (currentChar == '[') {
@@ -162,7 +141,6 @@ export class Tokenizer {
 					true
 				);
 			} else if (currentChar == ']') {
-				this.trimBefore();
 				this.expect(TokenType.LeftBracket, TokenType.RightBracket);
 				this.tokens.push(
 					Token(TokenType.RightBracket, currentChar, start)
@@ -211,57 +189,14 @@ export class Tokenizer {
 				continue;
 			} else {
 				if (isSpace(currentChar)) {
-					if (currentChar == '\n') {
-						const tokenBefore = this.tokens.last();
-						const canAppend = tokenBefore
-							? tokenBefore.text.startsWith('\n')
-							: false;
-						const lastToken = canAppend
-							? this.tokens.last(2)
-							: tokenBefore;
-						const nextChar = this.nextChar();
-						const isLastToken = nextChar === undefined;
-						const isFirstToken = lastToken === undefined;
-						const lastType = lastToken?.type;
-						const shouldEmitEol =
-							!isLastToken &&
-							!isFirstToken &&
-							lastType !== TokenType.Comma &&
-							lastType !== TokenType.EndOfLine &&
-							lastType !== TokenType.LeftBrace &&
-							lastType !== TokenType.LeftBracket &&
-							lastType !== TokenType.LeftParenthesis;
-						let type = shouldEmitEol
-							? TokenType.EndOfLine
-							: TokenType.IrrelevantToken;
-						if (canAppend) {
-							const token = tokenBefore as Token;
-							token.text += '\n';
-							token.type = type;
-							this.tokens[this.tokens.length - 1] = token;
-						} else {
-							const token = Token(type, '\n', start, 'newline');
-							this.tokens.push(token);
-						}
-					} else {
-						const tokenBefore = this.tokens.last();
-						if (
-							tokenBefore &&
-							tokenBefore.type == TokenType.IrrelevantToken &&
-							tokenBefore.content == 'space'
-						) {
-							tokenBefore.text += currentChar;
-							this.tokens[this.tokens.length - 1] = tokenBefore;
-						} else
-							this.tokens.push(
-								Token(
-									TokenType.IrrelevantToken,
-									currentChar,
-									start,
-									'space'
-								)
-							);
-					}
+					let text = '';
+					do {
+						text += currentChar;
+						if (!this.next()) break;
+						currentChar = this.getChar();
+					} while (isSpace(currentChar));
+					this.tokens.push(Token(TokenType.Space, text, start));
+					continue;
 				} else if (isDigit(currentChar)) {
 					let number = currentChar;
 					while (true) {
