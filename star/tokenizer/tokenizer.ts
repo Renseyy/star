@@ -249,7 +249,6 @@ export class Tokenizer {
 					const last = tokens[tokens.length - 1] as Token;
 					last.flags &= ~FLAGS.IS_IRRELEVANT;
 					tokens[tokens.length - 1] = last;
-					console.log(tokens);
 					this.tokens.push(...tokens);
 					continue;
 				} else if (isDigit(currentChar)) {

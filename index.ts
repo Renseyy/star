@@ -33,26 +33,28 @@ const scope: Scope = {
 	'+': operator(true, true),
 };
 const extendedTokens = scoper.resolveScopes(tokens, scope);
-console.table(
-	extendedTokens.map((token) => ({
-		...token,
-		text: token.text.replace(/[\r\n]/g, ''),
-		isIrrelevant: token.isIrrelevant(),
-		containsNewLine: token.containsNewLine(),
-	})),
-	[
-		'type',
-		'text',
-		'index',
-		'line',
-		'column',
-		'flags',
-		'isIrrelevant',
-		'containsNewLine',
-	]
-);
-console.log(renderCodeBlock(extendedTokens, true));
+// console.table(
+// 	extendedTokens.map((token) => ({
+// 		...token,
+// 		text: token.text.replace(/[\r\n]/g, ''),
+// 		isIrrelevant: token.isIrrelevant(),
+// 		containsNewLine: token.containsNewLine(),
+// 	})),
+// 	[
+// 		'type',
+// 		'text',
+// 		'index',
+// 		'line',
+// 		'column',
+// 		'flags',
+// 		'isIrrelevant',
+// 		'containsNewLine',
+// 	]
+// );
+// console.log(
+// 	renderCodeBlock(extendedTokens, false, 1, undefined, [], 'Code preview')
+// );
 const globalRegister = new MetaRegister();
 loadStdl(globalRegister);
 const element = liner.parse(extendedTokens, globalRegister);
-// console.dir(JSON.parse(JSON.stringify(element)), { depth: null });
+console.dir(JSON.parse(JSON.stringify(element)), { depth: null });

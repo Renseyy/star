@@ -5,7 +5,7 @@ import { ScopeStack, type Scope } from './scope';
 
 /**
  * Got MetaScope, and applies it to some tokens like objects or commands
- * notise that we also partially support directives #define_operator and #define_command
+ * notise that we also partially support directives #declare_operator and #declare_command
  *
  * That directives cannot be placed mannualy, remember that
  *
