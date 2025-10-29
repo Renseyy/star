@@ -24,11 +24,14 @@ export class Scoper {
 		let isSkipped = false;
 		let nextIsIrrelevant = false;
 		const resultTokens: ExtendedToken[] = [];
-		const getLastIgnoringSpaces = () => {
+		const getLastLineSeparatorIgnoringSpaces = () => {
 			for (let i = resultTokens.length - 1; i >= 0; i--) {
 				const token = resultTokens[i] as ExtendedToken;
 				if (token.type == TokenType.Space) {
 					continue;
+				}
+				if (token.type != TokenType.LineSeparator) {
+					return null;
 				}
 				return token;
 			}
@@ -49,7 +52,7 @@ export class Scoper {
 					TokenType.Comma
 				)
 			) {
-				const last = getLastIgnoringSpaces();
+				const last = getLastLineSeparatorIgnoringSpaces();
 				if (last) {
 					last.flags |= FLAGS.IS_IRRELEVANT;
 				}
@@ -104,15 +107,16 @@ export class Scoper {
 							nextIsIrrelevant = true;
 						}
 						if (element.ignoresLineBefore) {
-							const last = getLastIgnoringSpaces();
-							if (!last) continue;
-							if (last.type == TokenType.Space)
+							const last = getLastLineSeparatorIgnoringSpaces();
+							if (last) {
 								last.flags |= FLAGS.IS_IRRELEVANT;
+							}
 						}
 						extendedToken.flags |= FLAGS.IS_OPERATOR;
 					}
 					nextIsIrrelevant = false;
 					isSkipped = false;
+					console.log(extendedToken);
 					resultTokens.push(extendedToken);
 					continue;
 				}
@@ -124,7 +128,6 @@ export class Scoper {
 				TokenType.Semicolon,
 				TokenType.Comma
 			);
-
 			resultTokens.push(ExtendedToken(token, isSkipped, line, column));
 			column += token.text.length;
 			isSkipped = false;

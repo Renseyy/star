@@ -1,4 +1,4 @@
-import type { Block } from 'typescript';
+import type { Block, CallExpression } from 'typescript';
 import type { Extrans } from '../core/extrans';
 import type { Directive, HashCommands } from '../directive';
 import { Token, TokenType } from '../tokenizer/token';
@@ -324,7 +324,7 @@ export class Parser {
 		message: string,
 		suggestions: Suggestion[] = []
 	) {
-		console.log(
+		console.trace(
 			renderCodeBlock(
 				this.tokens,
 				false,
@@ -466,6 +466,31 @@ export class Parser {
 		return null;
 	}
 
+	public parseFunctionDeclaration(register: MetaRegister): Call {
+		const defaultConstructor = register.readElement(
+			Key('defaultConstructorArchetype')
+		);
+		if (!defaultConstructor) {
+			throw new Error('Cannot get default constructor');
+		}
+		return {
+			$: 'Call',
+			callee: defaultConstructor,
+			argumentBlock: this.parseCallBlock(register),
+		};
+	}
+
+	public parseDefaultIntexer(register: MetaRegister): IndexExpression {
+		const defaultConstructor = register.readElement(
+			Key('defaultIndexerArchetype')
+		);
+		if (!defaultConstructor) {
+			throw new Error('Cannot get default indexer');
+		}
+		const block = this.parseIndexBlock(register);
+		return IndexExpression(defaultConstructor, block.expressions);
+	}
+
 	public parseElement(register: MetaRegister): Expression {
 		let currentToken = this.getCurrentToken();
 		if (['Number', 'String'].includes(currentToken.type)) {
@@ -473,31 +498,16 @@ export class Parser {
 			return {
 				$: 'LiteralExpression',
 				contentType: currentToken.type,
-				value: currentToken.content || currentToken.text,
+				value:
+					(currentToken.content as string | undefined) ||
+					currentToken.text,
 			};
 		} else if (currentToken.type == TokenType.LeftBrace) {
 			return this.parseBlock(register);
 		} else if (currentToken.type == TokenType.LeftParenthesis) {
-			const defaultConstructor = register.readElement(
-				Key('defaultConstructorArchetype')
-			);
-			if (!defaultConstructor) {
-				throw new Error('Cannot get default constructor');
-			}
-			return {
-				$: 'Call',
-				callee: defaultConstructor,
-				argumentBlock: this.parseCallBlock(register),
-			};
+			return this.parseFunctionDeclaration(register);
 		} else if (currentToken.type == TokenType.LeftBracket) {
-			const defaultConstructor = register.readElement(
-				Key('defaultIndexerArchetype')
-			);
-			if (!defaultConstructor) {
-				throw new Error('Cannot get default indexer');
-			}
-			const block = this.parseIndexBlock(register);
-			return IndexExpression(defaultConstructor, block.expressions);
+			return this.parseDefaultIntexer(register);
 		} else if (currentToken.type == 'Identifier') {
 			return (
 				this.parseMaybePrefixOperator(register) ??
@@ -535,6 +545,7 @@ export class Parser {
 		register: MetaRegister,
 		rightBindingPower: bindingPower = 0
 	): Expression {
+		console.log(this.getCurrentToken());
 		let left = this.parseElement(register);
 		while (this.shouldParseInfixOrPostfix(register)) {
 			const token = this.getCurrentToken(true);
@@ -607,7 +618,9 @@ export class Parser {
 					(bindingPower == rightBindingPower &&
 						infixOperator.isRightBinded)
 				) {
+					console.log('Infix: ', this.getCurrentToken());
 					this.index++;
+					console.log('Infix2: ', this.getCurrentToken());
 					const right = this.parseExpression(register, bindingPower);
 					left = infixOperator.expression.creator(left, right);
 					continue;
@@ -638,7 +651,16 @@ export class Parser {
 		const postfixOperator = register.readElement(
 			CollectionKey('postfixOperator', token.text)
 		);
-		return postfixOperator != null;
+		if (postfixOperator != null) {
+			return true;
+		}
+		if (token.isOperator()) {
+			this.throwTokenError(
+				token,
+				`Could not find operator definition "${token.type}"`
+			);
+		}
+		return false;
 	}
 
 	private parseInner(
@@ -672,6 +694,7 @@ export class Parser {
 	): BlockExpression {
 		this.tokens = extendedToken;
 		this.index = 0;
+		console.table(extendedToken);
 		return {
 			$: 'BlockExpression',
 			expressions: this.parseInner(register),

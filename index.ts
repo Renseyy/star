@@ -31,6 +31,7 @@ const scope: Scope = {
 	':=': operator(false, true),
 	'=': operator(false, true),
 	'+': operator(true, true),
+	'=>': operator(true, true),
 };
 const extendedTokens = scoper.resolveScopes(tokens, scope);
 // console.table(
