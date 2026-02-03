@@ -1,8 +1,0 @@
-NewUserForm :: Form [
-    first_name: String
-    middle_name?: String
-    last_name: String
-    age: Int
-    password_hash: Snapshot Array(Bytes)
-]
-

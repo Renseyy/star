@@ -1,0 +1,13 @@
+// Creates const value
+hello :: "World"
+
+// This value can be mutated
+messages := ["Hello"]
+
+messages.push("world")
+
+messages = ["World", "Hello"]
+
+
+
+
